@@ -7,7 +7,7 @@ type Config struct {
 	Env  string
 }
 
-func load() *Config {
+func Load() *Config {
 	return &Config{
 		Port: getEnv("Port", "8080"),
 		Env:  getEnv("ENV", "development"),
