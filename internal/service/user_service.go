@@ -91,6 +91,14 @@ func (s *UserService) GetProfile(ctx context.Context, userID uuid.UUID) (*userRe
 	return user, nil
 }
 
+func (s *UserService) GetByEmail(ctx context.Context, email string) (*userRepo.User, error) {
+	user, err := s.repo.GetByEmail(ctx, email)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user by email: %w", err)
+	}
+	return user, nil
+}
+
 func (s *UserService) UpdateProfile(ctx context.Context, userID uuid.UUID, fullName, bio, avatarURL *string) (*userRepo.User, error) {
 	user, err := s.repo.GetByID(ctx, userID)
 	if err != nil {

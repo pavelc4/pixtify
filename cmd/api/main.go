@@ -34,7 +34,13 @@ func main() {
 
 	userRepository := userRepo.NewRepository(db)
 	userService := service.NewUserService(userRepository)
+	oauthService := service.NewOAuthService(
+		cfg.OAuth.GithubClientID,
+		cfg.OAuth.GithubClientSecret,
+		cfg.OAuth.GithubRedirectURL,
+		userService)
 	userHandler := handler.NewUserHandler(userService)
+	oauthHandler := handler.NewOAuthHandler(oauthService, userService)
 
 	app := fiber.New(fiber.Config{
 		AppName: "Pixtify API",
@@ -56,7 +62,7 @@ func main() {
 		})
 	})
 
-	handler.SetupRoutes(app, userHandler)
+	handler.SetupRoutes(app, userHandler, oauthHandler)
 
 	log.Printf("Pixtify API starting on port %s (environment: %s)", cfg.Port, cfg.Env)
 	if err := app.Listen(":" + cfg.Port); err != nil {

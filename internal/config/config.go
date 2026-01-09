@@ -10,6 +10,13 @@ type Config struct {
 	Port     string
 	Env      string
 	Database DatabaseConfig
+	OAuth    OAuthConfig
+}
+
+type OAuthConfig struct {
+	GithubClientID     string
+	GithubClientSecret string
+	GithubRedirectURL  string
 }
 
 type DatabaseConfig struct {
@@ -32,6 +39,11 @@ func Load() *Config {
 			Password: getEnv("DB_PASSWORD"),
 			Name:     getEnv("DB_NAME"),
 			SSLMode:  getEnv("DB_SSLMODE"),
+		},
+		OAuth: OAuthConfig{
+			GithubClientID:     getEnv("GITHUB_CLIENT_ID"),
+			GithubClientSecret: getEnv("GITHUB_CLIENT_SECRET"),
+			GithubRedirectURL:  getEnv("GITHUB_REDIRECT_URL"),
 		},
 	}
 	validate(cfg)
