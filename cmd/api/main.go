@@ -12,7 +12,7 @@ import (
 
 func main() {
 	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found")
+		log.Println("Warning: No .env file found")
 	}
 
 	cfg := config.Load()
@@ -32,8 +32,8 @@ func main() {
 		})
 	})
 
-	log.Printf(" Pixtify API starting on port %s (env: %s)", cfg.Port, cfg.Env)
+	log.Printf("Pixtify API starting on port %s (environment: %s)", cfg.Port, cfg.Env)
 	if err := app.Listen(":" + cfg.Port); err != nil {
-		log.Fatal("❌ Failed to start server:", err)
+		log.Fatal("Failed to start server:", err)
 	}
 }
