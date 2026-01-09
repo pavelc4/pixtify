@@ -22,15 +22,15 @@ type User struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
-type UserRepo struct {
+type Repository struct {
 	db *sql.DB
 }
 
-func NewUserRepository(db *sql.DB) *UserRepo {
-	return &UserRepo{db: db}
+func NewRepository(db *sql.DB) *Repository {
+	return &Repository{db: db}
 }
 
-func (r *UserRepo) Create(ctx context.Context, user *User) error {
+func (r *Repository) Create(ctx context.Context, user *User) error {
 	query := `
 		INSERT INTO users (username, email, password_hash, full_name, role)
 		VALUES ($1, $2, $3, $4, $5)
@@ -50,7 +50,7 @@ func (r *UserRepo) Create(ctx context.Context, user *User) error {
 	return err
 }
 
-func (r *UserRepo) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
+func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	query := `
 		SELECT id, username, email, password_hash, full_name, avatar_url,
 		       bio, is_verified, role, created_at, updated_at
@@ -80,7 +80,7 @@ func (r *UserRepo) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	return user, err
 }
 
-func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*User, error) {
+func (r *Repository) GetByEmail(ctx context.Context, email string) (*User, error) {
 	query := `
 		SELECT id, username, email, password_hash, full_name, avatar_url,
 		       bio, is_verified, role, created_at, updated_at
@@ -110,7 +110,7 @@ func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*User, error) 
 	return user, err
 }
 
-func (r *UserRepo) Update(ctx context.Context, user *User) error {
+func (r *Repository) Update(ctx context.Context, user *User) error {
 	query := `
 		UPDATE users
 		SET username = $1, full_name = $2, avatar_url = $3,
@@ -131,7 +131,7 @@ func (r *UserRepo) Update(ctx context.Context, user *User) error {
 	return err
 }
 
-func (r *UserRepo) Delete(ctx context.Context, id uuid.UUID) error {
+func (r *Repository) Delete(ctx context.Context, id uuid.UUID) error {
 	query := `DELETE FROM users WHERE id = $1`
 	_, err := r.db.ExecContext(ctx, query, id)
 	return err

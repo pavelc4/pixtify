@@ -9,17 +9,14 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/joho/godotenv"
 	"github.com/pavelc4/pixtify/internal/config"
+	"github.com/pavelc4/pixtify/internal/handler"
 	"github.com/pavelc4/pixtify/internal/repository/postgres"
+	userRepo "github.com/pavelc4/pixtify/internal/repository/postgres/user"
+	"github.com/pavelc4/pixtify/internal/service"
 )
 
 func main() {
-	envPath := ".env"
-	if err := godotenv.Load(envPath); err != nil {
-		log.Printf("Warning: Could not load %s: %v", envPath, err)
-	}
-
 	cfg := config.Load()
 
 	dbConfig := postgres.DBConfig{
@@ -35,6 +32,10 @@ func main() {
 	}
 	defer postgres.CloseDatabase(db)
 
+	userRepository := userRepo.NewRepository(db)
+	userService := service.NewUserService(userRepository)
+	userHandler := handler.NewUserHandler(userService)
+
 	app := fiber.New(fiber.Config{
 		AppName: "Pixtify API",
 	})
@@ -46,18 +47,16 @@ func main() {
 		if err := db.Ping(); err != nil {
 			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
 				"status":   "error",
-				"app":      "Pixtify API",
 				"database": "disconnected",
 			})
 		}
-
 		return c.JSON(fiber.Map{
 			"status":   "ok",
-			"app":      "Pixtify API",
-			"env":      cfg.Env,
 			"database": "connected",
 		})
 	})
+
+	handler.SetupRoutes(app, userHandler)
 
 	log.Printf("Pixtify API starting on port %s (environment: %s)", cfg.Port, cfg.Env)
 	if err := app.Listen(":" + cfg.Port); err != nil {

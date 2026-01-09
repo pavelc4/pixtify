@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/pavelc4/pixtify/internal/repository/postgres"
+	userRepo "github.com/pavelc4/pixtify/internal/repository/postgres/user"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -17,10 +17,10 @@ var (
 )
 
 type UserService struct {
-	repo *postgres.UserRepo
+	repo *userRepo.Repository
 }
 
-func NewUserService(repo *postgres.UserRepo) *UserService {
+func NewUserService(repo *userRepo.Repository) *UserService {
 	return &UserService{repo: repo}
 }
 
@@ -31,7 +31,7 @@ type RegisterInput struct {
 	FullName string `json:"full_name,omitempty"`
 }
 
-func (s *UserService) Register(ctx context.Context, input RegisterInput) (*postgres.User, error) {
+func (s *UserService) Register(ctx context.Context, input RegisterInput) (*userRepo.User, error) {
 	existing, err := s.repo.GetByEmail(ctx, input.Email)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check email: %w", err)
@@ -45,7 +45,7 @@ func (s *UserService) Register(ctx context.Context, input RegisterInput) (*postg
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	user := &postgres.User{
+	user := &userRepo.User{
 		Username:     input.Username,
 		Email:        input.Email,
 		PasswordHash: string(hashedPassword),
@@ -63,7 +63,7 @@ func (s *UserService) Register(ctx context.Context, input RegisterInput) (*postg
 	return user, nil
 }
 
-func (s *UserService) Login(ctx context.Context, email, password string) (*postgres.User, error) {
+func (s *UserService) Login(ctx context.Context, email, password string) (*userRepo.User, error) {
 	user, err := s.repo.GetByEmail(ctx, email)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
@@ -79,7 +79,7 @@ func (s *UserService) Login(ctx context.Context, email, password string) (*postg
 	return user, nil
 }
 
-func (s *UserService) GetProfile(ctx context.Context, userID uuid.UUID) (*postgres.User, error) {
+func (s *UserService) GetProfile(ctx context.Context, userID uuid.UUID) (*userRepo.User, error) {
 	user, err := s.repo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
@@ -91,7 +91,7 @@ func (s *UserService) GetProfile(ctx context.Context, userID uuid.UUID) (*postgr
 	return user, nil
 }
 
-func (s *UserService) UpdateProfile(ctx context.Context, userID uuid.UUID, fullName, bio, avatarURL *string) (*postgres.User, error) {
+func (s *UserService) UpdateProfile(ctx context.Context, userID uuid.UUID, fullName, bio, avatarURL *string) (*userRepo.User, error) {
 	user, err := s.repo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
