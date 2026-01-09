@@ -50,6 +50,36 @@ func (r *UserRepo) Create(ctx context.Context, user *User) error {
 	return err
 }
 
+func (r *UserRepo) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
+	query := `
+		SELECT id, username, email, password_hash, full_name, avatar_url,
+		       bio, is_verified, role, created_at, updated_at
+		FROM users
+		WHERE id = $1
+	`
+
+	user := &User{}
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&user.ID,
+		&user.Username,
+		&user.Email,
+		&user.PasswordHash,
+		&user.FullName,
+		&user.AvatarURL,
+		&user.Bio,
+		&user.IsVerified,
+		&user.Role,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+
+	return user, err
+}
+
 func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*User, error) {
 	query := `
 		SELECT id, username, email, password_hash, full_name, avatar_url,

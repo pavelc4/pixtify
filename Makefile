@@ -23,6 +23,10 @@ test-coverage:
 	go test -v -race -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
 
+test-repo:
+	@echo "Running repository tests..."
+	go test -v ./internal/repository/postgres/
+
 install:
 	@echo "Installing dependencies..."
 	go mod download
@@ -33,7 +37,7 @@ clean:
 	rm -rf bin/
 	rm -f coverage.out coverage.html
 
-# Lint	
+# Lint
 lint:
 	@echo "Running linter..."
 	golangci-lint run
