@@ -25,7 +25,7 @@ test-coverage:
 
 test-repo:
 	@echo "Running repository tests..."
-	go test -v ./internal/repository/postgres/
+	go test -v ./internal/repository/postgres/user
 
 install:
 	@echo "Installing dependencies..."
