@@ -1,74 +1,110 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"time"
 
-	_ "github.com/lib/pq"
-
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+
 	"github.com/pavelc4/pixtify/internal/config"
 	"github.com/pavelc4/pixtify/internal/handler"
+	"github.com/pavelc4/pixtify/internal/middleware"
+	"github.com/pavelc4/pixtify/internal/repository"
 	"github.com/pavelc4/pixtify/internal/repository/postgres"
-	userRepo "github.com/pavelc4/pixtify/internal/repository/postgres/user"
+	"github.com/pavelc4/pixtify/internal/repository/postgres/user"
 	"github.com/pavelc4/pixtify/internal/service"
 )
 
 func main() {
 	cfg := config.Load()
+	log.Println("Configuration loaded")
 
-	dbConfig := postgres.DBConfig{
-		DSN:             cfg.Database.GetDSN(),
-		MaxOpenConns:    25,
-		MaxIdleConns:    5,
-		ConnMaxLifetime: 5 * time.Minute,
-	}
-
-	db, err := postgres.NewDatabase(dbConfig)
+	db, err := postgres.NewPostgresDB(cfg.Database.GetDSN())
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
-	defer postgres.CloseDatabase(db)
+	defer db.Close()
+	log.Println("Database connected")
 
-	userRepository := userRepo.NewRepository(db)
-	userService := service.NewUserService(userRepository)
-	oauthService := service.NewOAuthService(
-		cfg.OAuth.GithubClientID,
-		cfg.OAuth.GithubClientSecret,
-		cfg.OAuth.GithubRedirectURL,
-		cfg.OAuth.GoogleClientID,
-		cfg.OAuth.GoogleClientSecret,
-		cfg.OAuth.GoogleRedirectURL,
-		userService)
+	accessExpiry, err := time.ParseDuration(cfg.JWT.AccessExpiry)
+	if err != nil {
+		log.Fatal("Invalid JWT_ACCESS_EXPIRY:", err)
+	}
+
+	refreshExpiry, err := time.ParseDuration(cfg.JWT.RefreshExpiry)
+	if err != nil {
+		log.Fatal("Invalid JWT_REFRESH_EXPIRY:", err)
+	}
+
+	userRepo := user.NewUserRepository(db)
+	refreshTokenRepo := repository.NewRefreshTokenRepository(db)
+	log.Println("Repositories initialized")
+
+	userService := service.NewUserService(userRepo)
+	oauthService := service.NewOAuthService(cfg.OAuth)
+	jwtService := service.NewJWTService(
+		cfg.JWT.AccessSecret,
+		cfg.JWT.RefreshSecret,
+		accessExpiry,
+		refreshExpiry,
+	)
+	log.Println("Services initialized")
+
 	userHandler := handler.NewUserHandler(userService)
-	oauthHandler := handler.NewOAuthHandler(oauthService, userService)
+	oauthHandler := handler.NewOAuthHandler(
+		oauthService,
+		userService,
+		jwtService,
+		refreshTokenRepo,
+	)
+	log.Println("Handlers initialized")
+
+	jwtMiddleware := middleware.NewJWTMiddleware(jwtService)
+	log.Println("Middleware initialized")
 
 	app := fiber.New(fiber.Config{
-		AppName: "Pixtify API",
+		AppName:      "Pixtify API",
+		ServerHeader: "Pixtify",
+		ErrorHandler: customErrorHandler,
 	})
 
 	app.Use(recover.New())
-	app.Use(logger.New())
+	app.Use(logger.New(logger.Config{
+		Format: "[${time}] ${status} - ${latency} ${method} ${path}\n",
+	}))
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     "http://localhost:3000,http://localhost:5173",
+		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
+		AllowHeaders:     "Origin,Content-Type,Accept,Authorization",
+		AllowCredentials: true,
+	}))
 
-	app.Get("/health", func(c *fiber.Ctx) error {
-		if err := db.Ping(); err != nil {
-			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{
-				"status":   "error",
-				"database": "disconnected",
-			})
-		}
-		return c.JSON(fiber.Map{
-			"status":   "ok",
-			"database": "connected",
-		})
-	})
+	handler.SetupRoutes(app, userHandler, oauthHandler, jwtMiddleware)
+	log.Println("Routes configured")
 
-	handler.SetupRoutes(app, userHandler, oauthHandler)
+	port := fmt.Sprintf(":%s", cfg.Port)
+	log.Printf("Server starting on port %s", cfg.Port)
+	log.Printf("Environment: %s", cfg.Env)
+	log.Printf("Access token expiry: %s", accessExpiry)
+	log.Printf("Refresh token expiry: %s", refreshExpiry)
 
-	log.Printf("Pixtify API starting on port %s (environment: %s)", cfg.Port, cfg.Env)
-	if err := app.Listen(":" + cfg.Port); err != nil {
+	if err := app.Listen(port); err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
+}
+
+func customErrorHandler(c *fiber.Ctx, err error) error {
+	code := fiber.StatusInternalServerError
+
+	if e, ok := err.(*fiber.Error); ok {
+		code = e.Code
+	}
+
+	return c.Status(code).JSON(fiber.Map{
+		"error": err.Error(),
+	})
 }

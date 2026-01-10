@@ -99,6 +99,14 @@ func (s *UserService) GetByEmail(ctx context.Context, email string) (*userRepo.U
 	return user, nil
 }
 
+func (s *UserService) GetByID(ctx context.Context, userID string) (*userRepo.User, error) {
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID format: %w", err)
+	}
+	return s.GetProfile(ctx, uid)
+}
+
 func (s *UserService) UpdateProfile(ctx context.Context, userID uuid.UUID, fullName, bio, avatarURL *string) (*userRepo.User, error) {
 	user, err := s.repo.GetByID(ctx, userID)
 	if err != nil {
