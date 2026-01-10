@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"strings"
 	"time"
@@ -8,6 +11,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/pavelc4/pixtify/internal/repository"
 	"github.com/pavelc4/pixtify/internal/service"
+	"github.com/pavelc4/pixtify/internal/utils"
 )
 
 type OAuthHandler struct {
@@ -15,6 +19,7 @@ type OAuthHandler struct {
 	userService      *service.UserService
 	jwtService       *service.JWTService
 	refreshTokenRepo *repository.RefreshTokenRepository
+	cookieSecret     string
 }
 
 func NewOAuthHandler(
@@ -22,22 +27,66 @@ func NewOAuthHandler(
 	userService *service.UserService,
 	jwtService *service.JWTService,
 	refreshTokenRepo *repository.RefreshTokenRepository,
+	cookieSecret string,
 ) *OAuthHandler {
 	return &OAuthHandler{
 		oauthService:     oauthService,
 		userService:      userService,
 		jwtService:       jwtService,
 		refreshTokenRepo: refreshTokenRepo,
+		cookieSecret:     cookieSecret,
 	}
 }
 
 func (h *OAuthHandler) GithubLogin(c *fiber.Ctx) error {
-	state := "random_state_string"
+	state, err := utils.GenerateRandomState()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to generate state",
+		})
+	}
+
+	signedState := h.signState(state)
+	c.Cookie(&fiber.Cookie{
+		Name:     "oauth_state",
+		Value:    signedState,
+		HTTPOnly: true,
+		Secure:   c.Protocol() == "https",
+		SameSite: "Lax",
+		MaxAge:   600,
+	})
+
 	url := h.oauthService.GetGithubAuthURL(state)
 	return c.Redirect(url)
 }
 
 func (h *OAuthHandler) GithubCallback(c *fiber.Ctx) error {
+	state := c.Query("state")
+	if state == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Authentication failed. Please try again.",
+		})
+	}
+
+	storedState := c.Cookies("oauth_state")
+	if storedState == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Authentication failed. Please try logging in again.",
+		})
+	}
+
+	if !h.verifyState(state, storedState) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Unable to connect to GitHub. Please try again.",
+		})
+	}
+
+	c.Cookie(&fiber.Cookie{
+		Name:   "oauth_state",
+		Value:  "",
+		MaxAge: -1,
+	})
+
 	code := c.Query("code")
 	if code == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -119,12 +168,54 @@ func (h *OAuthHandler) GithubCallback(c *fiber.Ctx) error {
 }
 
 func (h *OAuthHandler) GoogleLogin(c *fiber.Ctx) error {
-	state := "random_state_string"
+	state, err := utils.GenerateRandomState()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to generate state",
+		})
+	}
+
+	signedState := h.signState(state)
+	c.Cookie(&fiber.Cookie{
+		Name:     "oauth_state",
+		Value:    signedState,
+		HTTPOnly: true,
+		Secure:   c.Protocol() == "https",
+		SameSite: "Lax",
+		MaxAge:   600,
+	})
+
 	url := h.oauthService.GetGoogleAuthURL(state)
 	return c.Redirect(url)
 }
 
 func (h *OAuthHandler) GoogleCallback(c *fiber.Ctx) error {
+	state := c.Query("state")
+	if state == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Missing state parameter",
+		})
+	}
+
+	storedState := c.Cookies("oauth_state")
+	if storedState == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Authentication failed. Please try logging in again.",
+		})
+	}
+
+	if !h.verifyState(state, storedState) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Authentication failed. Please try logging in again.",
+		})
+	}
+
+	c.Cookie(&fiber.Cookie{
+		Name:   "oauth_state",
+		Value:  "",
+		MaxAge: -1,
+	})
+
 	code := c.Query("code")
 	if code == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -351,4 +442,31 @@ func (h *OAuthHandler) clearAuthCookies(c *fiber.Ctx) {
 		HTTPOnly: true,
 		MaxAge:   -1,
 	})
+}
+
+func (h *OAuthHandler) signState(state string) string {
+	mac := hmac.New(sha256.New, []byte(h.cookieSecret))
+	mac.Write([]byte(state))
+	signature := base64.URLEncoding.EncodeToString(mac.Sum(nil))
+	return fmt.Sprintf("%s.%s", state, signature)
+}
+
+func (h *OAuthHandler) verifyState(state, signedState string) bool {
+	parts := strings.Split(signedState, ".")
+	if len(parts) != 2 {
+		return false
+	}
+
+	storedState := parts[0]
+	storedSignature := parts[1]
+
+	if state != storedState {
+		return false
+	}
+
+	mac := hmac.New(sha256.New, []byte(h.cookieSecret))
+	mac.Write([]byte(storedState))
+	expectedSignature := base64.URLEncoding.EncodeToString(mac.Sum(nil))
+
+	return hmac.Equal([]byte(storedSignature), []byte(expectedSignature))
 }
