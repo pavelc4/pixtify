@@ -38,6 +38,9 @@ func main() {
 		cfg.OAuth.GithubClientID,
 		cfg.OAuth.GithubClientSecret,
 		cfg.OAuth.GithubRedirectURL,
+		cfg.OAuth.GoogleClientID,
+		cfg.OAuth.GoogleClientSecret,
+		cfg.OAuth.GoogleRedirectURL,
 		userService)
 	userHandler := handler.NewUserHandler(userService)
 	oauthHandler := handler.NewOAuthHandler(oauthService, userService)

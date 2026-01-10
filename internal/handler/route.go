@@ -12,8 +12,12 @@ func SetupRoutes(app *fiber.App, userHandler *UserHandler, oauthHandler *OAuthHa
 	users.Post("/login", userHandler.Login)
 	users.Get("/:id", userHandler.GetProfile)
 
-	// OAuth routes
+	// OAuth Github
 	auth := api.Group("/auth")
 	auth.Get("/github", oauthHandler.GithubLogin)
 	auth.Get("/github/callback", oauthHandler.GithubCallback)
+
+	// OAuth Google
+	auth.Get("/google", oauthHandler.GoogleLogin)
+	auth.Get("/google/callback", oauthHandler.GoogleCallback)
 }

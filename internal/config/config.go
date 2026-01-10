@@ -17,6 +17,9 @@ type OAuthConfig struct {
 	GithubClientID     string
 	GithubClientSecret string
 	GithubRedirectURL  string
+	GoogleClientID     string
+	GoogleClientSecret string
+	GoogleRedirectURL  string
 }
 
 type DatabaseConfig struct {
@@ -44,6 +47,9 @@ func Load() *Config {
 			GithubClientID:     getEnv("GITHUB_CLIENT_ID"),
 			GithubClientSecret: getEnv("GITHUB_CLIENT_SECRET"),
 			GithubRedirectURL:  getEnv("GITHUB_REDIRECT_URL"),
+			GoogleClientID:     getEnv("GOOGLE_CLIENT_ID"),
+			GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET"),
+			GoogleRedirectURL:  getEnv("GOOGLE_REDIRECT_URL"),
 		},
 	}
 	validate(cfg)
