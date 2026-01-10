@@ -10,26 +10,48 @@ func SetupRoutes(
 	userHandler *UserHandler,
 	oauthHandler *OAuthHandler,
 	jwtMiddleware *middleware.JWTMiddleware,
+	rateLimiter *middleware.RateLimiterMiddleware,
 ) {
 	// API routes
 	api := app.Group("/api")
 
-	// Public routes (No Auth Required)
+	// Apply general API
+	api.Use(rateLimiter.APILimiter())
+
+	// Public routes
 	public := api.Group("")
 	{
-		// User registration & login
-		public.Post("/users/register", userHandler.Register)
-		public.Post("/users/login", userHandler.Login)
+		// User registration
+		public.Post("/users/register",
+			rateLimiter.RegisterLimiter(),
+			userHandler.Register,
+		)
+		public.Post("/users/login",
+			rateLimiter.LoginLimiter(),
+			userHandler.Login,
+		)
 
 		// OAuth login redirects
-		public.Get("/auth/github", oauthHandler.GithubLogin)
-		public.Get("/auth/google", oauthHandler.GoogleLogin)
+		public.Get("/auth/github",
+			rateLimiter.OAuthLimiter(),
+			oauthHandler.GithubLogin,
+		)
+		public.Get("/auth/google",
+			rateLimiter.OAuthLimiter(),
+			oauthHandler.GoogleLogin,
+		)
 
 		// OAuth callbacks
-		public.Get("/auth/github/callback", oauthHandler.GithubCallback)
-		public.Get("/auth/google/callback", oauthHandler.GoogleCallback)
+		public.Get("/auth/github/callback",
+			rateLimiter.OAuthLimiter(),
+			oauthHandler.GithubCallback,
+		)
+		public.Get("/auth/google/callback",
+			rateLimiter.OAuthLimiter(),
+			oauthHandler.GoogleCallback,
+		)
 
-		// Refresh token endpoint
+		// Refresh token & logout
 		public.Post("/auth/refresh", oauthHandler.RefreshToken)
 		public.Post("/auth/logout", oauthHandler.Logout)
 	}
@@ -50,8 +72,12 @@ func SetupRoutes(
 		protected.Get("/users/:id", userHandler.GetProfile)
 	}
 
-	// Admin routes (Admin Role Required)
-	admin := api.Group("/admin", jwtMiddleware.Protected(), jwtMiddleware.RequireAdmin())
+	// Admin routes
+	admin := api.Group("/admin",
+		jwtMiddleware.Protected(),
+		jwtMiddleware.RequireAdmin(),
+		rateLimiter.AdminLimiter(),
+	)
 	{
 		admin.Get("/users", userHandler.ListAllUsers)
 		admin.Delete("/users/:id", userHandler.DeleteUser)

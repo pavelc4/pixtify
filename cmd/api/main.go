@@ -65,6 +65,8 @@ func main() {
 	log.Println("Handlers initialized")
 
 	jwtMiddleware := middleware.NewJWTMiddleware(jwtService)
+	rateLimitConfig := config.DefaultRateLimitConfig()
+	rateLimiter := middleware.NewRateLimiterMiddleware(rateLimitConfig)
 	log.Println("Middleware initialized")
 
 	app := fiber.New(fiber.Config{
@@ -84,7 +86,7 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	handler.SetupRoutes(app, userHandler, oauthHandler, jwtMiddleware)
+	handler.SetupRoutes(app, userHandler, oauthHandler, jwtMiddleware, rateLimiter)
 	log.Println("Routes configured")
 
 	port := fmt.Sprintf(":%s", cfg.Port)
@@ -92,6 +94,12 @@ func main() {
 	log.Printf("Environment: %s", cfg.Env)
 	log.Printf("Access token expiry: %s", accessExpiry)
 	log.Printf("Refresh token expiry: %s", refreshExpiry)
+
+	log.Printf("Rate limits configured:")
+	log.Printf("  - Login: %d req/%s", rateLimitConfig.LoginMax, rateLimitConfig.LoginWindow)
+	log.Printf("  - Register: %d req/%s", rateLimitConfig.RegisterMax, rateLimitConfig.RegisterWindow)
+	log.Printf("  - OAuth: %d req/%s", rateLimitConfig.OAuthMax, rateLimitConfig.OAuthWindow)
+	log.Printf("  - API: %d req/%s", rateLimitConfig.APIMax, rateLimitConfig.APIWindow)
 
 	if err := app.Listen(port); err != nil {
 		log.Fatal("Failed to start server:", err)
