@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/pavelc4/pixtify/internal/config"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
 	"golang.org/x/oauth2/google"
@@ -14,31 +15,27 @@ import (
 type OAuthService struct {
 	githubConfig *oauth2.Config
 	googleConfig *oauth2.Config
-	userService  *UserService
 }
 
-func NewOAuthService(
-	githubClientID, githubClientSecret, githubRedirectURL string, googleClientID, googleClientSecret, googleRedirectURL string,
-	userService *UserService) *OAuthService {
+func NewOAuthService(cfg config.OAuthConfig) *OAuthService {
 	return &OAuthService{
 		githubConfig: &oauth2.Config{
-			ClientID:     githubClientID,
-			ClientSecret: githubClientSecret,
-			RedirectURL:  githubRedirectURL,
+			ClientID:     cfg.GithubClientID,
+			ClientSecret: cfg.GithubClientSecret,
+			RedirectURL:  cfg.GithubRedirectURL,
 			Scopes:       []string{"user:email", "read:user"},
 			Endpoint:     github.Endpoint,
 		},
 		googleConfig: &oauth2.Config{
-			ClientID:     googleClientID,
-			ClientSecret: googleClientSecret,
-			RedirectURL:  googleRedirectURL,
+			ClientID:     cfg.GoogleClientID,
+			ClientSecret: cfg.GoogleClientSecret,
+			RedirectURL:  cfg.GoogleRedirectURL,
 			Scopes: []string{
 				"https://www.googleapis.com/auth/userinfo.email",
 				"https://www.googleapis.com/auth/userinfo.profile",
 			},
 			Endpoint: google.Endpoint,
 		},
-		userService: userService,
 	}
 }
 
