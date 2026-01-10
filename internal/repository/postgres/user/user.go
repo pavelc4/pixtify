@@ -30,6 +30,10 @@ func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db}
 }
 
+func NewUserRepository(db *sql.DB) *Repository {
+	return NewRepository(db)
+}
+
 func (r *Repository) Create(ctx context.Context, user *User) error {
 	query := `
 		INSERT INTO users (username, email, password_hash, full_name, role)

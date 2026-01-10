@@ -34,6 +34,16 @@ func NewDatabase(cfg DBConfig) (*sql.DB, error) {
 	return db, nil
 }
 
+func NewPostgresDB(dsn string) (*sql.DB, error) {
+	cfg := DBConfig{
+		DSN:             dsn,
+		MaxOpenConns:    25,
+		MaxIdleConns:    5,
+		ConnMaxLifetime: 5 * time.Minute,
+	}
+	return NewDatabase(cfg)
+}
+
 func CloseDatabase(db *sql.DB) {
 	if err := db.Close(); err != nil {
 		log.Printf("Error closing database: %v", err)
