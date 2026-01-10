@@ -9,11 +9,12 @@ import (
 )
 
 type Config struct {
-	Port     string
-	Env      string
-	Database DatabaseConfig
-	OAuth    OAuthConfig
-	JWT      JWTConfig
+	Port         string
+	Env          string
+	CookieSecret string
+	Database     DatabaseConfig
+	OAuth        OAuthConfig
+	JWT          JWTConfig
 }
 
 type DatabaseConfig struct {
@@ -46,8 +47,9 @@ func Load() *Config {
 		log.Println("Warning: .env file not found")
 	}
 	cfg := &Config{
-		Port: getEnv("PORT", "8080"),
-		Env:  getEnv("ENV", "development"),
+		Port:         getEnv("PORT", "8080"),
+		Env:          getEnv("ENV", "development"),
+		CookieSecret: getEnv("COOKIE_SECRET", ""),
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
 			Port:     getEnv("DB_PORT", "5432"),
@@ -87,6 +89,9 @@ func validate(cfg *Config) {
 
 	if cfg.JWT.RefreshSecret == "" {
 		log.Fatal("JWT_REFRESH_SECRET is required")
+	}
+	if cfg.CookieSecret == "" {
+		log.Fatal("COOKIE_SECRET is required")
 	}
 }
 
