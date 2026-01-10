@@ -3,6 +3,7 @@ package handler
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/pavelc4/pixtify/internal/middleware"
 	"github.com/pavelc4/pixtify/internal/service"
 )
 
@@ -24,11 +25,30 @@ type UserResponse struct {
 	AvatarURL *string `json:"avatar_url,omitempty"`
 }
 
-// Register handles user registration
 func (h *UserHandler) Register(c *fiber.Ctx) error {
 	var input service.RegisterInput
 	if err := c.BodyParser(&input); err != nil {
 		return badRequestError(c, "Invalid request body")
+	}
+
+	input.Username = middleware.SanitizeString(input.Username)
+	input.Email = middleware.SanitizeEmail(input.Email)
+	input.FullName = middleware.SanitizeString(input.FullName)
+
+	if input.Username == "" || input.Email == "" || input.Password == "" {
+		return badRequestError(c, "Username, email, and password are required")
+	}
+
+	if !middleware.IsValidUsername(input.Username) {
+		return badRequestError(c, "Invalid username format (3-20 chars, alphanumeric, underscore, hyphen)")
+	}
+
+	if !middleware.IsValidEmail(input.Email) {
+		return badRequestError(c, "Invalid email format")
+	}
+
+	if len(input.Password) < 8 {
+		return badRequestError(c, "Password must be at least 8 characters")
 	}
 
 	user, err := h.userService.Register(c.Context(), input)
@@ -55,6 +75,16 @@ func (h *UserHandler) Login(c *fiber.Ctx) error {
 		return badRequestError(c, "Invalid request body")
 	}
 
+	input.Email = middleware.SanitizeEmail(input.Email)
+
+	if input.Email == "" || input.Password == "" {
+		return badRequestError(c, "Email and password are required")
+	}
+
+	if !middleware.IsValidEmail(input.Email) {
+		return badRequestError(c, "Invalid email format")
+	}
+
 	user, err := h.userService.Login(c.Context(), input.Email, input.Password)
 	if err != nil {
 		if err == service.ErrInvalidCredentials {
@@ -71,6 +101,8 @@ func (h *UserHandler) Login(c *fiber.Ctx) error {
 
 func (h *UserHandler) GetProfile(c *fiber.Ctx) error {
 	id := c.Params("id")
+
+	id = middleware.SanitizeString(id)
 
 	userID, err := uuid.Parse(id)
 	if err != nil {
@@ -114,6 +146,33 @@ func (h *UserHandler) UpdateCurrentUser(c *fiber.Ctx) error {
 
 	if err := c.BodyParser(&input); err != nil {
 		return badRequestError(c, "Invalid request body")
+	}
+
+	if input.FullName != nil {
+		sanitized := middleware.SanitizeString(*input.FullName)
+		input.FullName = &sanitized
+
+		if len(*input.FullName) > 100 {
+			return badRequestError(c, "Full name too long (max 100 characters)")
+		}
+	}
+
+	if input.Bio != nil {
+		sanitized := middleware.SanitizeString(*input.Bio)
+		input.Bio = &sanitized
+
+		if len(*input.Bio) > 500 {
+			return badRequestError(c, "Bio too long (max 500 characters)")
+		}
+	}
+
+	if input.AvatarURL != nil {
+		sanitized := middleware.SanitizeString(*input.AvatarURL)
+		input.AvatarURL = &sanitized
+
+		if len(*input.AvatarURL) > 500 {
+			return badRequestError(c, "Avatar URL too long")
+		}
 	}
 
 	uid, err := uuid.Parse(userID)

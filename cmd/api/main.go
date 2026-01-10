@@ -67,14 +67,21 @@ func main() {
 	jwtMiddleware := middleware.NewJWTMiddleware(jwtService)
 	rateLimitConfig := config.DefaultRateLimitConfig()
 	rateLimiter := middleware.NewRateLimiterMiddleware(rateLimitConfig)
+	securityMiddleware := middleware.NewSecurityMiddleware()
 	log.Println("Middleware initialized")
 
 	app := fiber.New(fiber.Config{
 		AppName:      "Pixtify API",
 		ServerHeader: "Pixtify",
 		ErrorHandler: customErrorHandler,
+		BodyLimit:    10 * 1024 * 1024,
 	})
 
+	app.Use(securityMiddleware.SecurityHeaders())
+	app.Use(securityMiddleware.PathTraversalProtection())
+	app.Use(securityMiddleware.ValidateContentType())
+	app.Use(securityMiddleware.SQLInjectionProtection())
+	app.Use(securityMiddleware.XSSProtection())
 	app.Use(recover.New())
 	app.Use(logger.New(logger.Config{
 		Format: "[${time}] ${status} - ${latency} ${method} ${path}\n",
@@ -94,8 +101,15 @@ func main() {
 	log.Printf("Environment: %s", cfg.Env)
 	log.Printf("Access token expiry: %s", accessExpiry)
 	log.Printf("Refresh token expiry: %s", refreshExpiry)
+	log.Println("Security features enabled:")
+	log.Println("  ✓ Security headers (XSS, Clickjacking, MIME-sniff protection)")
+	log.Println("  ✓ SQL injection protection")
+	log.Println("  ✓ XSS attack protection")
+	log.Println("  ✓ Path traversal protection")
+	log.Println("  ✓ Content-Type validation")
+	log.Println("  ✓ Max body size: 10MB")
 
-	log.Printf("Rate limits configured:")
+	log.Println("Rate limits configured:")
 	log.Printf("  - Login: %d req/%s", rateLimitConfig.LoginMax, rateLimitConfig.LoginWindow)
 	log.Printf("  - Register: %d req/%s", rateLimitConfig.RegisterMax, rateLimitConfig.RegisterWindow)
 	log.Printf("  - OAuth: %d req/%s", rateLimitConfig.OAuthMax, rateLimitConfig.OAuthWindow)
