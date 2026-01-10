@@ -3,27 +3,36 @@ package handler
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/pavelc4/pixtify/internal/repository"
 	"github.com/pavelc4/pixtify/internal/service"
 )
 
 type OAuthHandler struct {
-	oauthService *service.OAuthService
-	userService  *service.UserService
+	oauthService     *service.OAuthService
+	userService      *service.UserService
+	jwtService       *service.JWTService
+	refreshTokenRepo *repository.RefreshTokenRepository
 }
 
-func NewOAuthHandler(oauthService *service.OAuthService, userService *service.UserService) *OAuthHandler {
+func NewOAuthHandler(
+	oauthService *service.OAuthService,
+	userService *service.UserService,
+	jwtService *service.JWTService,
+	refreshTokenRepo *repository.RefreshTokenRepository,
+) *OAuthHandler {
 	return &OAuthHandler{
-		oauthService: oauthService,
-		userService:  userService,
+		oauthService:     oauthService,
+		userService:      userService,
+		jwtService:       jwtService,
+		refreshTokenRepo: refreshTokenRepo,
 	}
 }
 
 func (h *OAuthHandler) GithubLogin(c *fiber.Ctx) error {
-
-	state := "random_state_string" // TODO: Generate secure random state
-
+	state := "random_state_string"
 	url := h.oauthService.GetGithubAuthURL(state)
 	return c.Redirect(url)
 }
@@ -58,7 +67,7 @@ func (h *OAuthHandler) GithubCallback(c *fiber.Ctx) error {
 		registerInput := service.RegisterInput{
 			Username: githubUser.Login,
 			Email:    githubUser.Email,
-			Password: "oauth_user", // Random password for OAuth users
+			Password: "oauth_user",
 			FullName: githubUser.Name,
 		}
 
@@ -70,7 +79,32 @@ func (h *OAuthHandler) GithubCallback(c *fiber.Ctx) error {
 		}
 	}
 
-	// TODO: Generate JWT token here
+	accessToken, err := h.jwtService.GenerateAccessToken(
+		user.ID.String(),
+		user.Email,
+		user.Role,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to generate access token",
+		})
+	}
+
+	refreshToken, err := h.jwtService.GenerateRefreshToken(user.ID.String())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to generate refresh token",
+		})
+	}
+
+	expiresAt := time.Now().Add(h.jwtService.GetRefreshExpiry())
+	if err := h.refreshTokenRepo.Store(c.Context(), user.ID.String(), refreshToken, expiresAt); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to store refresh token",
+		})
+	}
+
+	h.setAuthCookies(c, accessToken, refreshToken)
 
 	return c.JSON(fiber.Map{
 		"message": "GitHub authentication successful",
@@ -78,7 +112,7 @@ func (h *OAuthHandler) GithubCallback(c *fiber.Ctx) error {
 			ID:       user.ID.String(),
 			Username: user.Username,
 			Email:    user.Email,
-			FullName: user.FullName,
+			FullName: getStringValue(user.FullName),
 			Role:     user.Role,
 		},
 	})
@@ -130,14 +164,191 @@ func (h *OAuthHandler) GoogleCallback(c *fiber.Ctx) error {
 		}
 	}
 
+	accessToken, err := h.jwtService.GenerateAccessToken(
+		user.ID.String(),
+		user.Email,
+		user.Role,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to generate access token",
+		})
+	}
+
+	refreshToken, err := h.jwtService.GenerateRefreshToken(user.ID.String())
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to generate refresh token",
+		})
+	}
+
+	expiresAt := time.Now().Add(h.jwtService.GetRefreshExpiry())
+	if err := h.refreshTokenRepo.Store(c.Context(), user.ID.String(), refreshToken, expiresAt); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to store refresh token",
+		})
+	}
+
+	h.setAuthCookies(c, accessToken, refreshToken)
+
 	return c.JSON(fiber.Map{
 		"message": "Google authentication successful",
 		"user": UserResponse{
 			ID:       user.ID.String(),
 			Username: user.Username,
 			Email:    user.Email,
-			FullName: user.FullName,
+			FullName: getStringValue(user.FullName),
 			Role:     user.Role,
 		},
+	})
+}
+
+func (h *OAuthHandler) RefreshToken(c *fiber.Ctx) error {
+	refreshToken := c.Cookies("refresh_token")
+	if refreshToken == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Missing refresh token",
+		})
+	}
+
+	claims, err := h.jwtService.ValidateRefreshToken(refreshToken)
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Invalid refresh token",
+		})
+	}
+
+	storedToken, err := h.refreshTokenRepo.GetByToken(c.Context(), refreshToken)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to validate token",
+		})
+	}
+	if storedToken == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Token has been revoked or expired",
+		})
+	}
+
+	user, err := h.userService.GetByID(c.Context(), claims.UserID)
+	if err != nil || user == nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "User not found",
+		})
+	}
+
+	newAccessToken, err := h.jwtService.GenerateAccessToken(
+		user.ID.String(),
+		user.Email,
+		user.Role,
+	)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to generate access token",
+		})
+	}
+
+	c.Cookie(&fiber.Cookie{
+		Name:     "access_token",
+		Value:    newAccessToken,
+		HTTPOnly: true,
+		Secure:   c.Protocol() == "https",
+		SameSite: "Lax",
+		MaxAge:   int(h.jwtService.GetAccessExpiry().Seconds()),
+	})
+
+	return c.JSON(fiber.Map{
+		"message": "Token refreshed successfully",
+	})
+}
+
+func (h *OAuthHandler) Logout(c *fiber.Ctx) error {
+	refreshToken := c.Cookies("refresh_token")
+
+	if refreshToken != "" {
+		if err := h.refreshTokenRepo.Revoke(c.Context(), refreshToken); err != nil {
+			// Log error but continue logout
+		}
+	}
+
+	h.clearAuthCookies(c)
+
+	return c.JSON(fiber.Map{
+		"message": "Logout successful",
+	})
+}
+
+func (h *OAuthHandler) LogoutAll(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+
+	if err := h.refreshTokenRepo.RevokeAllByUserID(c.Context(), userID); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to logout from all devices",
+		})
+	}
+
+	h.clearAuthCookies(c)
+
+	return c.JSON(fiber.Map{
+		"message": "Logged out from all devices",
+	})
+}
+
+func (h *OAuthHandler) GetProfile(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+
+	user, err := h.userService.GetByID(c.Context(), userID)
+	if err != nil || user == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "User not found",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"user": UserResponse{
+			ID:       user.ID.String(),
+			Username: user.Username,
+			Email:    user.Email,
+			FullName: getStringValue(user.FullName),
+			Role:     user.Role,
+		},
+	})
+}
+
+func (h *OAuthHandler) setAuthCookies(c *fiber.Ctx, accessToken, refreshToken string) {
+	isSecure := c.Protocol() == "https"
+
+	c.Cookie(&fiber.Cookie{
+		Name:     "access_token",
+		Value:    accessToken,
+		HTTPOnly: true,
+		Secure:   isSecure,
+		SameSite: "Lax",
+		MaxAge:   int(h.jwtService.GetAccessExpiry().Seconds()),
+	})
+
+	c.Cookie(&fiber.Cookie{
+		Name:     "refresh_token",
+		Value:    refreshToken,
+		HTTPOnly: true,
+		Secure:   isSecure,
+		SameSite: "Lax",
+		MaxAge:   int(h.jwtService.GetRefreshExpiry().Seconds()),
+	})
+}
+
+func (h *OAuthHandler) clearAuthCookies(c *fiber.Ctx) {
+	c.Cookie(&fiber.Cookie{
+		Name:     "access_token",
+		Value:    "",
+		HTTPOnly: true,
+		MaxAge:   -1,
+	})
+
+	c.Cookie(&fiber.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		HTTPOnly: true,
+		MaxAge:   -1,
 	})
 }
