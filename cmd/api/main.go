@@ -60,6 +60,7 @@ func main() {
 		userService,
 		jwtService,
 		refreshTokenRepo,
+		cfg.CookieSecret,
 	)
 	log.Println("Handlers initialized")
 
