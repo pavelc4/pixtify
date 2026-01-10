@@ -9,45 +9,21 @@ import (
 	_ "github.com/lib/pq"
 )
 
-type DBConfig struct {
-	DSN             string
-	MaxOpenConns    int
-	MaxIdleConns    int
-	ConnMaxLifetime time.Duration
-}
-
-func NewDatabase(cfg DBConfig) (*sql.DB, error) {
-	db, err := sql.Open("postgres", cfg.DSN)
+func NewPostgresDB(dsn string) (*sql.DB, error) {
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	db.SetMaxOpenConns(cfg.MaxOpenConns)
-	db.SetMaxIdleConns(cfg.MaxIdleConns)
-	db.SetConnMaxLifetime(cfg.ConnMaxLifetime)
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
 
 	if err := db.Ping(); err != nil {
+		db.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
 	log.Println("Database connection established successfully")
 	return db, nil
-}
-
-func NewPostgresDB(dsn string) (*sql.DB, error) {
-	cfg := DBConfig{
-		DSN:             dsn,
-		MaxOpenConns:    25,
-		MaxIdleConns:    5,
-		ConnMaxLifetime: 5 * time.Minute,
-	}
-	return NewDatabase(cfg)
-}
-
-func CloseDatabase(db *sql.DB) {
-	if err := db.Close(); err != nil {
-		log.Printf("Error closing database: %v", err)
-	} else {
-		log.Println("Database connection closed")
-	}
 }

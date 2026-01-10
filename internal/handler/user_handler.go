@@ -28,31 +28,20 @@ type UserResponse struct {
 func (h *UserHandler) Register(c *fiber.Ctx) error {
 	var input service.RegisterInput
 	if err := c.BodyParser(&input); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
+		return badRequestError(c, "Invalid request body")
 	}
 
 	user, err := h.userService.Register(c.Context(), input)
 	if err != nil {
 		if err == service.ErrUserExists {
-			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-				"error": "User already exists",
-			})
+			return conflictError(c, "User already exists")
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to register user",
-		})
+		return internalError(c, "Failed to register user")
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "User registered successfully",
-		"user": UserResponse{
-			ID:       user.ID.String(),
-			Username: user.Username,
-			Email:    user.Email,
-			Role:     user.Role,
-		},
+		"user":    newUserResponse(user),
 	})
 }
 
@@ -63,31 +52,20 @@ func (h *UserHandler) Login(c *fiber.Ctx) error {
 	}
 
 	if err := c.BodyParser(&input); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
+		return badRequestError(c, "Invalid request body")
 	}
 
 	user, err := h.userService.Login(c.Context(), input.Email, input.Password)
 	if err != nil {
 		if err == service.ErrInvalidCredentials {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Invalid credentials",
-			})
+			return unauthorizedError(c, "Invalid credentials")
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to login",
-		})
+		return internalError(c, "Failed to login")
 	}
 
 	return c.JSON(fiber.Map{
 		"message": "Login successful",
-		"user": UserResponse{
-			ID:       user.ID.String(),
-			Username: user.Username,
-			Email:    user.Email,
-			Role:     user.Role,
-		},
+		"user":    newUserResponse(user),
 	})
 }
 
@@ -96,33 +74,19 @@ func (h *UserHandler) GetProfile(c *fiber.Ctx) error {
 
 	userID, err := uuid.Parse(id)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid user ID",
-		})
+		return badRequestError(c, "Invalid user ID")
 	}
 
 	user, err := h.userService.GetProfile(c.Context(), userID)
 	if err != nil {
 		if err == service.ErrUserNotFound {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "User not found",
-			})
+			return notFoundError(c, "User not found")
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to get user profile",
-		})
+		return internalError(c, "Failed to get user profile")
 	}
 
 	return c.JSON(fiber.Map{
-		"user": UserResponse{
-			ID:        user.ID.String(),
-			Username:  user.Username,
-			Email:     user.Email,
-			FullName:  getStringValue(user.FullName),
-			Role:      user.Role,
-			Bio:       user.Bio,
-			AvatarURL: user.AvatarURL,
-		},
+		"user": newUserResponse(user),
 	})
 }
 
@@ -131,21 +95,11 @@ func (h *UserHandler) GetCurrentUser(c *fiber.Ctx) error {
 
 	user, err := h.userService.GetByID(c.Context(), userID)
 	if err != nil || user == nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "User not found",
-		})
+		return notFoundError(c, "User not found")
 	}
 
 	return c.JSON(fiber.Map{
-		"user": UserResponse{
-			ID:        user.ID.String(),
-			Username:  user.Username,
-			Email:     user.Email,
-			FullName:  getStringValue(user.FullName),
-			Role:      user.Role,
-			Bio:       user.Bio,
-			AvatarURL: user.AvatarURL,
-		},
+		"user": newUserResponse(user),
 	})
 }
 
@@ -159,41 +113,25 @@ func (h *UserHandler) UpdateCurrentUser(c *fiber.Ctx) error {
 	}
 
 	if err := c.BodyParser(&input); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid request body",
-		})
+		return badRequestError(c, "Invalid request body")
 	}
 
 	uid, err := uuid.Parse(userID)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid user ID",
-		})
+		return badRequestError(c, "Invalid user ID")
 	}
 
 	user, err := h.userService.UpdateProfile(c.Context(), uid, input.FullName, input.Bio, input.AvatarURL)
 	if err != nil {
 		if err == service.ErrUserNotFound {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "User not found",
-			})
+			return notFoundError(c, "User not found")
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to update profile",
-		})
+		return internalError(c, "Failed to update profile")
 	}
 
 	return c.JSON(fiber.Map{
 		"message": "Profile updated successfully",
-		"user": UserResponse{
-			ID:        user.ID.String(),
-			Username:  user.Username,
-			Email:     user.Email,
-			FullName:  getStringValue(user.FullName),
-			Role:      user.Role,
-			Bio:       user.Bio,
-			AvatarURL: user.AvatarURL,
-		},
+		"user":    newUserResponse(user),
 	})
 }
 
@@ -227,11 +165,4 @@ func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{
 		"error": "Admin user deletion not implemented yet",
 	})
-}
-
-func getStringValue(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
 }

@@ -79,19 +79,22 @@ func Load() *Config {
 }
 
 func validate(cfg *Config) {
-	if cfg.Database.Password == "" {
-		log.Fatal("DB_PASSWORD is required")
+	required := map[string]string{
+		"DB_PASSWORD":        cfg.Database.Password,
+		"JWT_SECRET":         cfg.JWT.AccessSecret,
+		"JWT_REFRESH_SECRET": cfg.JWT.RefreshSecret,
+		"COOKIE_SECRET":      cfg.CookieSecret,
 	}
 
-	if cfg.JWT.AccessSecret == "" {
-		log.Fatal("JWT_SECRET is required")
+	var missing []string
+	for key, value := range required {
+		if value == "" {
+			missing = append(missing, key)
+		}
 	}
 
-	if cfg.JWT.RefreshSecret == "" {
-		log.Fatal("JWT_REFRESH_SECRET is required")
-	}
-	if cfg.CookieSecret == "" {
-		log.Fatal("COOKIE_SECRET is required")
+	if len(missing) > 0 {
+		log.Fatalf("Missing required environment variables: %v", missing)
 	}
 }
 

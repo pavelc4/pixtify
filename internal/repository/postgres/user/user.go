@@ -3,10 +3,13 @@ package user
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+var ErrUserNotFound = errors.New("user not found")
 
 type User struct {
 	ID           uuid.UUID `json:"id"`
@@ -78,7 +81,7 @@ func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	)
 
 	if err == sql.ErrNoRows {
-		return nil, nil
+		return nil, ErrUserNotFound
 	}
 
 	return user, err
@@ -108,7 +111,7 @@ func (r *Repository) GetByEmail(ctx context.Context, email string) (*User, error
 	)
 
 	if err == sql.ErrNoRows {
-		return nil, nil
+		return nil, ErrUserNotFound
 	}
 
 	return user, err

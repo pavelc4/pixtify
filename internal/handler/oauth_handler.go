@@ -41,9 +41,7 @@ func NewOAuthHandler(
 func (h *OAuthHandler) GithubLogin(c *fiber.Ctx) error {
 	state, err := utils.GenerateRandomState()
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to generate state",
-		})
+		return internalError(c, "Failed to generate state")
 	}
 
 	signedState := h.signState(state)
@@ -63,22 +61,16 @@ func (h *OAuthHandler) GithubLogin(c *fiber.Ctx) error {
 func (h *OAuthHandler) GithubCallback(c *fiber.Ctx) error {
 	state := c.Query("state")
 	if state == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Authentication failed. Please try again.",
-		})
+		return badRequestError(c, "Authentication failed. Please try again.")
 	}
 
 	storedState := c.Cookies("oauth_state")
 	if storedState == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Authentication failed. Please try logging in again.",
-		})
+		return badRequestError(c, "Authentication failed. Please try logging in again.")
 	}
 
 	if !h.verifyState(state, storedState) {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Unable to connect to GitHub. Please try again.",
-		})
+		return badRequestError(c, "Unable to connect to GitHub. Please try again.")
 	}
 
 	c.Cookie(&fiber.Cookie{
@@ -89,16 +81,12 @@ func (h *OAuthHandler) GithubCallback(c *fiber.Ctx) error {
 
 	code := c.Query("code")
 	if code == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Missing authorization code",
-		})
+		return badRequestError(c, "Missing authorization code")
 	}
 
 	githubUser, err := h.oauthService.HandleGithubCallback(c.Context(), code)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to authenticate with GitHub",
-		})
+		return internalError(c, "Failed to authenticate with GitHub")
 	}
 
 	if githubUser.Email == "" {
@@ -107,9 +95,7 @@ func (h *OAuthHandler) GithubCallback(c *fiber.Ctx) error {
 
 	user, err := h.userService.GetByEmail(c.Context(), githubUser.Email)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Database error",
-		})
+		return internalError(c, "Database error")
 	}
 
 	if user == nil {
@@ -122,9 +108,7 @@ func (h *OAuthHandler) GithubCallback(c *fiber.Ctx) error {
 
 		user, err = h.userService.Register(c.Context(), registerInput)
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to create user",
-			})
+			return internalError(c, "Failed to create user")
 		}
 	}
 
@@ -134,45 +118,31 @@ func (h *OAuthHandler) GithubCallback(c *fiber.Ctx) error {
 		user.Role,
 	)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to generate access token",
-		})
+		return internalError(c, "Failed to generate access token")
 	}
 
 	refreshToken, err := h.jwtService.GenerateRefreshToken(user.ID.String())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to generate refresh token",
-		})
+		return internalError(c, "Failed to generate refresh token")
 	}
 
 	expiresAt := time.Now().Add(h.jwtService.GetRefreshExpiry())
 	if err := h.refreshTokenRepo.Store(c.Context(), user.ID.String(), refreshToken, expiresAt); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to store refresh token",
-		})
+		return internalError(c, "Failed to store refresh token")
 	}
 
 	h.setAuthCookies(c, accessToken, refreshToken)
 
 	return c.JSON(fiber.Map{
 		"message": "GitHub authentication successful",
-		"user": UserResponse{
-			ID:       user.ID.String(),
-			Username: user.Username,
-			Email:    user.Email,
-			FullName: getStringValue(user.FullName),
-			Role:     user.Role,
-		},
+		"user":    newUserResponse(user),
 	})
 }
 
 func (h *OAuthHandler) GoogleLogin(c *fiber.Ctx) error {
 	state, err := utils.GenerateRandomState()
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to generate state",
-		})
+		return internalError(c, "Failed to generate state")
 	}
 
 	signedState := h.signState(state)
@@ -192,22 +162,16 @@ func (h *OAuthHandler) GoogleLogin(c *fiber.Ctx) error {
 func (h *OAuthHandler) GoogleCallback(c *fiber.Ctx) error {
 	state := c.Query("state")
 	if state == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Missing state parameter",
-		})
+		return badRequestError(c, "Missing state parameter")
 	}
 
 	storedState := c.Cookies("oauth_state")
 	if storedState == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Authentication failed. Please try logging in again.",
-		})
+		return badRequestError(c, "Authentication failed. Please try logging in again.")
 	}
 
 	if !h.verifyState(state, storedState) {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Authentication failed. Please try logging in again.",
-		})
+		return badRequestError(c, "Authentication failed. Please try logging in again.")
 	}
 
 	c.Cookie(&fiber.Cookie{
@@ -218,23 +182,17 @@ func (h *OAuthHandler) GoogleCallback(c *fiber.Ctx) error {
 
 	code := c.Query("code")
 	if code == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Missing authorization code",
-		})
+		return badRequestError(c, "Missing authorization code")
 	}
 
 	googleUser, err := h.oauthService.HandleGoogleCallback(c.Context(), code)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to authenticate with Google",
-		})
+		return internalError(c, "Failed to authenticate with Google")
 	}
 
 	user, err := h.userService.GetByEmail(c.Context(), googleUser.Email)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Database error",
-		})
+		return internalError(c, "Database error")
 	}
 
 	if user == nil {
@@ -249,9 +207,7 @@ func (h *OAuthHandler) GoogleCallback(c *fiber.Ctx) error {
 
 		user, err = h.userService.Register(c.Context(), registerInput)
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "Failed to create user",
-			})
+			return internalError(c, "Failed to create user")
 		}
 	}
 
@@ -261,71 +217,49 @@ func (h *OAuthHandler) GoogleCallback(c *fiber.Ctx) error {
 		user.Role,
 	)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to generate access token",
-		})
+		return internalError(c, "Failed to generate access token")
 	}
 
 	refreshToken, err := h.jwtService.GenerateRefreshToken(user.ID.String())
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to generate refresh token",
-		})
+		return internalError(c, "Failed to generate refresh token")
 	}
 
 	expiresAt := time.Now().Add(h.jwtService.GetRefreshExpiry())
 	if err := h.refreshTokenRepo.Store(c.Context(), user.ID.String(), refreshToken, expiresAt); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to store refresh token",
-		})
+		return internalError(c, "Failed to store refresh token")
 	}
 
 	h.setAuthCookies(c, accessToken, refreshToken)
 
 	return c.JSON(fiber.Map{
 		"message": "Google authentication successful",
-		"user": UserResponse{
-			ID:       user.ID.String(),
-			Username: user.Username,
-			Email:    user.Email,
-			FullName: getStringValue(user.FullName),
-			Role:     user.Role,
-		},
+		"user":    newUserResponse(user),
 	})
 }
 
 func (h *OAuthHandler) RefreshToken(c *fiber.Ctx) error {
 	refreshToken := c.Cookies("refresh_token")
 	if refreshToken == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Missing refresh token",
-		})
+		return unauthorizedError(c, "Missing refresh token")
 	}
 
 	claims, err := h.jwtService.ValidateRefreshToken(refreshToken)
 	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Invalid refresh token",
-		})
+		return unauthorizedError(c, "Invalid refresh token")
 	}
 
 	storedToken, err := h.refreshTokenRepo.GetByToken(c.Context(), refreshToken)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to validate token",
-		})
+		return internalError(c, "Failed to validate token")
 	}
 	if storedToken == nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Token has been revoked or expired",
-		})
+		return unauthorizedError(c, "Token has been revoked or expired")
 	}
 
 	user, err := h.userService.GetByID(c.Context(), claims.UserID)
 	if err != nil || user == nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "User not found",
-		})
+		return unauthorizedError(c, "User not found")
 	}
 
 	newAccessToken, err := h.jwtService.GenerateAccessToken(
@@ -334,9 +268,7 @@ func (h *OAuthHandler) RefreshToken(c *fiber.Ctx) error {
 		user.Role,
 	)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to generate access token",
-		})
+		return internalError(c, "Failed to generate access token")
 	}
 
 	c.Cookie(&fiber.Cookie{
@@ -373,9 +305,7 @@ func (h *OAuthHandler) LogoutAll(c *fiber.Ctx) error {
 	userID := c.Locals("user_id").(string)
 
 	if err := h.refreshTokenRepo.RevokeAllByUserID(c.Context(), userID); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to logout from all devices",
-		})
+		return internalError(c, "Failed to logout from all devices")
 	}
 
 	h.clearAuthCookies(c)
@@ -390,19 +320,11 @@ func (h *OAuthHandler) GetProfile(c *fiber.Ctx) error {
 
 	user, err := h.userService.GetByID(c.Context(), userID)
 	if err != nil || user == nil {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "User not found",
-		})
+		return notFoundError(c, "User not found")
 	}
 
 	return c.JSON(fiber.Map{
-		"user": UserResponse{
-			ID:       user.ID.String(),
-			Username: user.Username,
-			Email:    user.Email,
-			FullName: getStringValue(user.FullName),
-			Role:     user.Role,
-		},
+		"user": newUserResponse(user),
 	})
 }
 

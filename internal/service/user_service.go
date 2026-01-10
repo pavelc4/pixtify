@@ -52,15 +52,20 @@ func (s *UserService) Register(ctx context.Context, input RegisterInput) (*userR
 		Role:         "user",
 	}
 
-	if input.FullName != "" {
-		user.FullName = &input.FullName
-	}
+	user.FullName = stringPtr(input.FullName)
 
 	if err := s.repo.Create(ctx, user); err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
 	return user, nil
+}
+
+func stringPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 func (s *UserService) Login(ctx context.Context, email, password string) (*userRepo.User, error) {
