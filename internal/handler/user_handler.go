@@ -151,33 +151,77 @@ func (h *UserHandler) UpdateCurrentUser(c *fiber.Ctx) error {
 }
 
 func (h *UserHandler) DeleteCurrentUser(c *fiber.Ctx) error {
-	// userID := c.Locals("user_id").(string)
+	userID := c.Locals("user_id").(string)
 
-	// TODO: Implement user deletion
-	// For now, just return not implemented
+	uid, err := uuid.Parse(userID)
+	if err != nil {
+		return badRequestError(c, "Invalid user ID")
+	}
 
-	return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{
-		"error": "User deletion not implemented yet",
+	if err := h.userService.DeleteUser(c.Context(), uid); err != nil {
+		if err == service.ErrUserNotFound {
+			return notFoundError(c, "User not found")
+		}
+		return internalError(c, "Failed to delete user")
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "User account deleted successfully",
 	})
 }
 
 // ListAllUsers handles listing all users (admin only)
 func (h *UserHandler) ListAllUsers(c *fiber.Ctx) error {
-	// TODO: Implement user listing with pagination
-	// For now, just return not implemented
+	// Get pagination params
+	page := c.QueryInt("page", 1)
+	limit := c.QueryInt("limit", 20)
 
-	return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{
-		"error": "User listing not implemented yet",
+	// Validate pagination
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+
+	users, total, err := h.userService.ListUsers(c.Context(), page, limit)
+	if err != nil {
+		return internalError(c, "Failed to list users")
+	}
+
+	// Convert to response format
+	userResponses := make([]UserResponse, len(users))
+	for i, user := range users {
+		userResponses[i] = newUserResponse(user)
+	}
+
+	return c.JSON(fiber.Map{
+		"users": userResponses,
+		"pagination": fiber.Map{
+			"page":        page,
+			"limit":       limit,
+			"total":       total,
+			"total_pages": (total + limit - 1) / limit,
+		},
 	})
 }
 
 func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
-	// id := c.Params("id")
+	id := c.Params("id")
 
-	// TODO: Implement admin user deletion
-	// For now, just return not implemented
+	userID, err := uuid.Parse(id)
+	if err != nil {
+		return badRequestError(c, "Invalid user ID")
+	}
 
-	return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{
-		"error": "Admin user deletion not implemented yet",
+	if err := h.userService.DeleteUser(c.Context(), userID); err != nil {
+		if err == service.ErrUserNotFound {
+			return notFoundError(c, "User not found")
+		}
+		return internalError(c, "Failed to delete user")
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "User deleted successfully",
 	})
 }

@@ -44,6 +44,7 @@ func SetupRoutes(
 		protected.Post("/auth/logout-all", oauthHandler.LogoutAll)
 
 		// User endpoints
+		protected.Get("/users", userHandler.ListAllUsers)
 		protected.Get("/users/me", userHandler.GetCurrentUser)
 		protected.Put("/users/me", userHandler.UpdateCurrentUser)
 		protected.Delete("/users/me", userHandler.DeleteCurrentUser)

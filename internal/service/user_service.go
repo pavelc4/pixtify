@@ -137,3 +137,31 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID uuid.UUID, fullN
 
 	return user, nil
 }
+
+func (s *UserService) DeleteUser(ctx context.Context, userID uuid.UUID) error {
+	user, err := s.repo.GetByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, userRepo.ErrUserNotFound) {
+			return ErrUserNotFound
+		}
+		return fmt.Errorf("failed to get user: %w", err)
+	}
+
+	if err := s.repo.Delete(ctx, user.ID); err != nil {
+		return fmt.Errorf("failed to delete user: %w", err)
+	}
+
+	return nil
+}
+
+func (s *UserService) ListUsers(ctx context.Context, page, limit int) ([]*userRepo.User, int, error) {
+	// Calculate offset
+	offset := (page - 1) * limit
+
+	users, total, err := s.repo.ListWithPagination(ctx, offset, limit)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list users: %w", err)
+	}
+
+	return users, total, nil
+}
