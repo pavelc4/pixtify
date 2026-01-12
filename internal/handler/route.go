@@ -55,7 +55,8 @@ func SetupRoutes(
 		// REPORTS
 		protected.Post("/reports", reportHandler.CreateReport)
 
-		// TODO: Admin/Moderator routes (implement BanUser, UnbanUser, GetUserStats handlers first)
+		// Moderator/Owner routes (for content moderation - no separate dashboard)
+		// TODO: Implement BanUser, UnbanUser, GetUserStats handlers
 		// moderator := protected.Group("", jwtMiddleware.RequireModeratorOrOwner())
 		// {
 		// 	moderator.Post("/users/:id/ban", userHandler.BanUser)

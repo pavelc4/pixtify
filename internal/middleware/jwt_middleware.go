@@ -56,13 +56,41 @@ func (m *JWTMiddleware) Protected() fiber.Handler {
 	}
 }
 
-func (m *JWTMiddleware) RequireAdmin() fiber.Handler {
+func (m *JWTMiddleware) RequireOwner() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		role := c.Locals("role")
 
-		if role == nil || role != "admin" {
+		if role == nil || role != "owner" {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"error": "Admin access required",
+				"error": "Owner access required",
+			})
+		}
+
+		return c.Next()
+	}
+}
+
+func (m *JWTMiddleware) RequireModerator() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		role := c.Locals("role")
+
+		if role == nil || role != "moderator" {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "Moderator access required",
+			})
+		}
+
+		return c.Next()
+	}
+}
+
+func (m *JWTMiddleware) RequireModeratorOrOwner() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		role := c.Locals("role")
+
+		if role == nil || (role != "moderator" && role != "owner") {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "Moderator or Owner access required",
 			})
 		}
 

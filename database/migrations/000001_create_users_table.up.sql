@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
     avatar_url VARCHAR(500),
     bio TEXT,
     is_verified BOOLEAN DEFAULT FALSE,
-    role VARCHAR(20) DEFAULT 'user' CHECK (role IN ('user', 'admin')),
+    role VARCHAR(20) DEFAULT 'user' CHECK (role IN ('user', 'owner', 'moderator')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
