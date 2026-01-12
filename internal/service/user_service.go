@@ -33,7 +33,7 @@ type RegisterInput struct {
 
 func (s *UserService) Register(ctx context.Context, input RegisterInput) (*userRepo.User, error) {
 	existing, err := s.repo.GetByEmail(ctx, input.Email)
-	if err != nil {
+	if err != nil && !errors.Is(err, userRepo.ErrUserNotFound) {
 		return nil, fmt.Errorf("failed to check email: %w", err)
 	}
 	if existing != nil {
@@ -71,10 +71,10 @@ func stringPtr(s string) *string {
 func (s *UserService) Login(ctx context.Context, email, password string) (*userRepo.User, error) {
 	user, err := s.repo.GetByEmail(ctx, email)
 	if err != nil {
+		if errors.Is(err, userRepo.ErrUserNotFound) {
+			return nil, ErrInvalidCredentials
+		}
 		return nil, fmt.Errorf("failed to get user: %w", err)
-	}
-	if user == nil {
-		return nil, ErrInvalidCredentials
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
@@ -87,10 +87,10 @@ func (s *UserService) Login(ctx context.Context, email, password string) (*userR
 func (s *UserService) GetProfile(ctx context.Context, userID uuid.UUID) (*userRepo.User, error) {
 	user, err := s.repo.GetByID(ctx, userID)
 	if err != nil {
+		if errors.Is(err, userRepo.ErrUserNotFound) {
+			return nil, ErrUserNotFound
+		}
 		return nil, fmt.Errorf("failed to get user: %w", err)
-	}
-	if user == nil {
-		return nil, ErrUserNotFound
 	}
 
 	return user, nil
@@ -115,10 +115,10 @@ func (s *UserService) GetByID(ctx context.Context, userID string) (*userRepo.Use
 func (s *UserService) UpdateProfile(ctx context.Context, userID uuid.UUID, fullName, bio, avatarURL *string) (*userRepo.User, error) {
 	user, err := s.repo.GetByID(ctx, userID)
 	if err != nil {
+		if errors.Is(err, userRepo.ErrUserNotFound) {
+			return nil, ErrUserNotFound
+		}
 		return nil, fmt.Errorf("failed to get user: %w", err)
-	}
-	if user == nil {
-		return nil, ErrUserNotFound
 	}
 
 	if fullName != nil {
