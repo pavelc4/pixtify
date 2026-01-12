@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"time"
@@ -85,6 +86,15 @@ func main() {
 	)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize MinIO storage: %v. Wallpaper uploads will fail.", err)
+	} else {
+		// buckets
+		buckets := []string{cfg.Storage.BucketOriginals, cfg.Storage.BucketThumbnails}
+		err = minioStorage.InitializeBuckets(context.Background(), buckets)
+		if err != nil {
+			log.Printf("Warning: Failed to initialize MinIO buckets: %v", err)
+		} else {
+			log.Println("MinIO buckets initialized and policies set")
+		}
 	}
 
 	wallpaperRepo := wallpaper.NewRepository(db)
@@ -101,6 +111,7 @@ func main() {
 		AppName:      "Pixtify API",
 		ServerHeader: "Pixtify",
 		ErrorHandler: customErrorHandler,
+		BodyLimit:    100 * 1024 * 1024,
 	})
 
 	app.Use(recover.New())
