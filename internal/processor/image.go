@@ -17,7 +17,7 @@ type ImageProcessor struct {
 
 func NewImageProcessor() *ImageProcessor {
 	return &ImageProcessor{
-		maxSizeBytes: 10 * 1024 * 1024, // 10MB
+		maxSizeBytes: 100 * 1024 * 1024, // 100MB
 		allowedTypes: []string{"image/jpeg", "image/png", "image/webp"},
 	}
 }
@@ -32,7 +32,7 @@ type ImageInfo struct {
 func (p *ImageProcessor) ValidateImage(data []byte, contentType string) (*ImageInfo, error) {
 	// Check size
 	if int64(len(data)) > p.maxSizeBytes {
-		return nil, fmt.Errorf("image too large (max 10MB)")
+		return nil, fmt.Errorf("image too large (max 100MB)")
 	}
 
 	// Check type
