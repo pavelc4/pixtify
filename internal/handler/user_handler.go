@@ -8,10 +8,14 @@ import (
 
 type UserHandler struct {
 	userService *service.UserService
+	jwtService  *service.JWTService
 }
 
-func NewUserHandler(userService *service.UserService) *UserHandler {
-	return &UserHandler{userService: userService}
+func NewUserHandler(userService *service.UserService, jwtService *service.JWTService) *UserHandler {
+	return &UserHandler{
+		userService: userService,
+		jwtService:  jwtService,
+	}
 }
 
 type UserResponse struct {
@@ -63,9 +67,20 @@ func (h *UserHandler) Login(c *fiber.Ctx) error {
 		return internalError(c, "Failed to login")
 	}
 
+	// Generate JWT access token
+	accessToken, err := h.jwtService.GenerateAccessToken(
+		user.ID.String(),
+		user.Email,
+		user.Role,
+	)
+	if err != nil {
+		return internalError(c, "Failed to generate access token")
+	}
+
 	return c.JSON(fiber.Map{
-		"message": "Login successful",
-		"user":    newUserResponse(user),
+		"message":      "Login successful",
+		"user":         newUserResponse(user),
+		"access_token": accessToken,
 	})
 }
 

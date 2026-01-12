@@ -9,6 +9,7 @@ func SetupRoutes(
 	app *fiber.App,
 	userHandler *UserHandler,
 	oauthHandler *OAuthHandler,
+	reportHandler *ReportHandler,
 	jwtMiddleware *middleware.JWTMiddleware,
 	rateLimiter *middleware.RateLimiterMiddleware,
 ) {
@@ -21,37 +22,16 @@ func SetupRoutes(
 	// Public routes
 	public := api.Group("")
 	{
-		// User registration
-		public.Post("/users/register",
-			rateLimiter.RegisterLimiter(),
-			userHandler.Register,
-		)
-		public.Post("/users/login",
-			rateLimiter.LoginLimiter(),
-			userHandler.Login,
-		)
+		public.Post("/users/register", rateLimiter.RegisterLimiter(), userHandler.Register)
+		public.Post("/users/login", rateLimiter.LoginLimiter(), userHandler.Login)
 
-		// OAuth login redirects
-		public.Get("/auth/github",
-			rateLimiter.OAuthLimiter(),
-			oauthHandler.GithubLogin,
-		)
-		public.Get("/auth/google",
-			rateLimiter.OAuthLimiter(),
-			oauthHandler.GoogleLogin,
-		)
+		// OAuth
+		public.Get("/auth/github", rateLimiter.OAuthLimiter(), oauthHandler.GithubLogin)
+		public.Get("/auth/google", rateLimiter.OAuthLimiter(), oauthHandler.GoogleLogin)
+		public.Get("/auth/github/callback", rateLimiter.OAuthLimiter(), oauthHandler.GithubCallback)
+		public.Get("/auth/google/callback", rateLimiter.OAuthLimiter(), oauthHandler.GoogleCallback)
 
-		// OAuth callbacks
-		public.Get("/auth/github/callback",
-			rateLimiter.OAuthLimiter(),
-			oauthHandler.GithubCallback,
-		)
-		public.Get("/auth/google/callback",
-			rateLimiter.OAuthLimiter(),
-			oauthHandler.GoogleCallback,
-		)
-
-		// Refresh token & logout
+		// Token
 		public.Post("/auth/refresh", oauthHandler.RefreshToken)
 		public.Post("/auth/logout", oauthHandler.Logout)
 	}
@@ -70,17 +50,17 @@ func SetupRoutes(
 
 		// Public user profile
 		protected.Get("/users/:id", userHandler.GetProfile)
-	}
 
-	// Admin routes
-	admin := api.Group("/admin",
-		jwtMiddleware.Protected(),
-		jwtMiddleware.RequireAdmin(),
-		rateLimiter.AdminLimiter(),
-	)
-	{
-		admin.Get("/users", userHandler.ListAllUsers)
-		admin.Delete("/users/:id", userHandler.DeleteUser)
+		// REPORTS
+		protected.Post("/reports", reportHandler.CreateReport)
+
+		// TODO: Admin/Moderator routes (implement BanUser, UnbanUser, GetUserStats handlers first)
+		// moderator := protected.Group("", jwtMiddleware.RequireModeratorOrOwner())
+		// {
+		// 	moderator.Post("/users/:id/ban", userHandler.BanUser)
+		// 	moderator.Post("/users/:id/unban", userHandler.UnbanUser)
+		// 	moderator.Get("/users/:id/stats", userHandler.GetUserStats)
+		// }
 	}
 
 	// Health check

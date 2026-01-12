@@ -54,7 +54,7 @@ func main() {
 	)
 	log.Println("Services initialized")
 
-	userHandler := handler.NewUserHandler(userService)
+	userHandler := handler.NewUserHandler(userService, jwtService)
 	oauthHandler := handler.NewOAuthHandler(
 		oauthService,
 		userService,
@@ -63,6 +63,11 @@ func main() {
 		cfg.CookieSecret,
 	)
 	log.Println("Handlers initialized")
+
+	reportRepo := repository.NewReportRepository(db)
+	reportService := service.NewReportService(reportRepo)
+	reportHandler := handler.NewReportHandler(reportService, userService)
+	log.Println("Report handlers initialized")
 
 	jwtMiddleware := middleware.NewJWTMiddleware(jwtService)
 	rateLimitConfig := config.DefaultRateLimitConfig()
@@ -86,7 +91,7 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	handler.SetupRoutes(app, userHandler, oauthHandler, jwtMiddleware, rateLimiter)
+	handler.SetupRoutes(app, userHandler, oauthHandler, reportHandler, jwtMiddleware, rateLimiter)
 	log.Println("Routes configured")
 
 	port := fmt.Sprintf(":%s", cfg.Port)
