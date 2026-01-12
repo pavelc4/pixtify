@@ -15,6 +15,7 @@ type Config struct {
 	Database     DatabaseConfig
 	OAuth        OAuthConfig
 	JWT          JWTConfig
+	Storage      StorageConfig
 }
 
 type DatabaseConfig struct {
@@ -40,6 +41,17 @@ type JWTConfig struct {
 	RefreshSecret string
 	AccessExpiry  string
 	RefreshExpiry string
+}
+
+type StorageConfig struct {
+	Provider         string
+	Endpoint         string
+	AccessKey        string
+	SecretKey        string
+	BucketOriginals  string
+	BucketThumbnails string
+	UseSSL           bool
+	CDNURL           string
 }
 
 func Load() *Config {
@@ -71,6 +83,16 @@ func Load() *Config {
 			RefreshSecret: getEnv("JWT_REFRESH_SECRET", ""),
 			AccessExpiry:  getEnv("JWT_ACCESS_EXPIRY", "15m"),
 			RefreshExpiry: getEnv("JWT_REFRESH_EXPIRY", "168h"),
+		},
+		Storage: StorageConfig{
+			Provider:         getEnv("STORAGE_PROVIDER", "minio"),
+			Endpoint:         getEnv("STORAGE_ENDPOINT", "localhost:9000"),
+			AccessKey:        getEnv("STORAGE_ACCESS_KEY", "minioadmin"),
+			SecretKey:        getEnv("STORAGE_SECRET_KEY", "minioadmin"),
+			BucketOriginals:  getEnv("STORAGE_BUCKET_ORIGINALS", "pixtify-originals"),
+			BucketThumbnails: getEnv("STORAGE_BUCKET_THUMBNAILS", "pixtify-thumbnails"),
+			UseSSL:           getEnv("STORAGE_USE_SSL", "false") == "true",
+			CDNURL:           getEnv("CDN_BASE_URL", ""),
 		},
 	}
 

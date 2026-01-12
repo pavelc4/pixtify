@@ -46,5 +46,9 @@ func (s *MinIOStorage) Delete(ctx context.Context, bucket, key string) error {
 }
 
 func (s *MinIOStorage) GetPresignedURL(ctx context.Context, bucket, key string, expirySeconds int) (string, error) {
-	return s.client.PresignedGetObject(ctx, bucket, key, time.Duration(expirySeconds)*time.Second, nil)
+	u, err := s.client.PresignedGetObject(ctx, bucket, key, time.Duration(expirySeconds)*time.Second, nil)
+	if err != nil {
+		return "", err
+	}
+	return u.String(), nil
 }

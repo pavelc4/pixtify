@@ -13,10 +13,13 @@ import (
 	"github.com/pavelc4/pixtify/internal/config"
 	"github.com/pavelc4/pixtify/internal/handler"
 	"github.com/pavelc4/pixtify/internal/middleware"
+	"github.com/pavelc4/pixtify/internal/processor"
 	"github.com/pavelc4/pixtify/internal/repository"
 	"github.com/pavelc4/pixtify/internal/repository/postgres"
 	"github.com/pavelc4/pixtify/internal/repository/postgres/user"
+	"github.com/pavelc4/pixtify/internal/repository/postgres/wallpaper"
 	"github.com/pavelc4/pixtify/internal/service"
+	"github.com/pavelc4/pixtify/internal/storage"
 )
 
 func main() {
@@ -69,6 +72,26 @@ func main() {
 	reportHandler := handler.NewReportHandler(reportService, userService)
 	log.Println("Report handlers initialized")
 
+	// Wallpaper System
+	imageProcessor := processor.NewImageProcessor()
+
+	// MinIO
+	minioStorage, err := storage.NewMinIOStorage(
+		cfg.Storage.Endpoint,
+		cfg.Storage.AccessKey,
+		cfg.Storage.SecretKey,
+		cfg.Storage.CDNURL,
+		cfg.Storage.UseSSL,
+	)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize MinIO storage: %v. Wallpaper uploads will fail.", err)
+	}
+
+	wallpaperRepo := wallpaper.NewRepository(db)
+	wallpaperService := service.NewWallpaperService(wallpaperRepo, minioStorage, imageProcessor)
+	wallpaperHandler := handler.NewWallpaperHandler(wallpaperService)
+	log.Println("Wallpaper system initialized")
+
 	jwtMiddleware := middleware.NewJWTMiddleware(jwtService)
 	rateLimitConfig := config.DefaultRateLimitConfig()
 	rateLimiter := middleware.NewRateLimiterMiddleware(rateLimitConfig)
@@ -91,7 +114,7 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	handler.SetupRoutes(app, userHandler, oauthHandler, reportHandler, jwtMiddleware, rateLimiter)
+	handler.SetupRoutes(app, userHandler, oauthHandler, reportHandler, wallpaperHandler, jwtMiddleware, rateLimiter)
 	log.Println("Routes configured")
 
 	port := fmt.Sprintf(":%s", cfg.Port)
