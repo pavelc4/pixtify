@@ -165,3 +165,62 @@ func (s *UserService) ListUsers(ctx context.Context, page, limit int) ([]*userRe
 
 	return users, total, nil
 }
+
+func (s *UserService) BanUser(ctx context.Context, userID, bannedBy uuid.UUID) error {
+	user, err := s.repo.GetByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, userRepo.ErrUserNotFound) {
+			return ErrUserNotFound
+		}
+		return fmt.Errorf("failed to get user: %w", err)
+	}
+
+	if err := s.repo.BanUser(ctx, user.ID, bannedBy); err != nil {
+		return fmt.Errorf("failed to ban user: %w", err)
+	}
+
+	return nil
+}
+
+func (s *UserService) UnbanUser(ctx context.Context, userID uuid.UUID) error {
+	user, err := s.repo.GetByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, userRepo.ErrUserNotFound) {
+			return ErrUserNotFound
+		}
+		return fmt.Errorf("failed to get user: %w", err)
+	}
+
+	if err := s.repo.UnbanUser(ctx, user.ID); err != nil {
+		return fmt.Errorf("failed to unban user: %w", err)
+	}
+
+	return nil
+}
+
+func (s *UserService) GetUserStats(ctx context.Context, userID uuid.UUID) (map[string]interface{}, error) {
+	user, err := s.repo.GetByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, userRepo.ErrUserNotFound) {
+			return nil, ErrUserNotFound
+		}
+		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	// Basic user stats (can be extended with wallpaper counts, likes, etc)
+	stats := map[string]interface{}{
+		"user_id":     user.ID,
+		"username":    user.Username,
+		"role":        user.Role,
+		"is_verified": user.IsVerified,
+		"is_banned":   user.IsBanned,
+		"created_at":  user.CreatedAt,
+		// TODO: Add wallpaper_count, likes_count, reports_count when tables exist
+	}
+
+	if user.BannedAt != nil {
+		stats["banned_at"] = user.BannedAt
+	}
+
+	return stats, nil
+}

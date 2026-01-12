@@ -225,3 +225,70 @@ func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 		"message": "User deleted successfully",
 	})
 }
+
+func (h *UserHandler) BanUser(c *fiber.Ctx) error {
+	targetID := c.Params("id")
+	moderatorID := c.Locals("user_id").(string)
+
+	targetUUID, err := uuid.Parse(targetID)
+	if err != nil {
+		return badRequestError(c, "Invalid user ID")
+	}
+
+	moderatorUUID, err := uuid.Parse(moderatorID)
+	if err != nil {
+		return internalError(c, "Invalid moderator ID")
+	}
+
+	if err := h.userService.BanUser(c.Context(), targetUUID, moderatorUUID); err != nil {
+		if err == service.ErrUserNotFound {
+			return notFoundError(c, "User not found")
+		}
+		return internalError(c, "Failed to ban user")
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "User banned successfully",
+	})
+}
+
+func (h *UserHandler) UnbanUser(c *fiber.Ctx) error {
+	targetID := c.Params("id")
+
+	targetUUID, err := uuid.Parse(targetID)
+	if err != nil {
+		return badRequestError(c, "Invalid user ID")
+	}
+
+	if err := h.userService.UnbanUser(c.Context(), targetUUID); err != nil {
+		if err == service.ErrUserNotFound {
+			return notFoundError(c, "User not found")
+		}
+		return internalError(c, "Failed to unban user")
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "User unbanned successfully",
+	})
+}
+
+func (h *UserHandler) GetUserStats(c *fiber.Ctx) error {
+	targetID := c.Params("id")
+
+	targetUUID, err := uuid.Parse(targetID)
+	if err != nil {
+		return badRequestError(c, "Invalid user ID")
+	}
+
+	stats, err := h.userService.GetUserStats(c.Context(), targetUUID)
+	if err != nil {
+		if err == service.ErrUserNotFound {
+			return notFoundError(c, "User not found")
+		}
+		return internalError(c, "Failed to get user stats")
+	}
+
+	return c.JSON(fiber.Map{
+		"stats": stats,
+	})
+}

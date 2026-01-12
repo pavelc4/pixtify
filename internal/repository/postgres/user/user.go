@@ -12,17 +12,20 @@ import (
 var ErrUserNotFound = errors.New("user not found")
 
 type User struct {
-	ID           uuid.UUID `json:"id"`
-	Username     string    `json:"username"`
-	Email        string    `json:"email"`
-	PasswordHash string    `json:"-"`
-	FullName     *string   `json:"full_name,omitempty"`
-	AvatarURL    *string   `json:"avatar_url,omitempty"`
-	Bio          *string   `json:"bio,omitempty"`
-	IsVerified   bool      `json:"is_verified"`
-	Role         string    `json:"role"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID           uuid.UUID  `json:"id"`
+	Username     string     `json:"username"`
+	Email        string     `json:"email"`
+	PasswordHash string     `json:"-"`
+	FullName     *string    `json:"full_name,omitempty"`
+	AvatarURL    *string    `json:"avatar_url,omitempty"`
+	Bio          *string    `json:"bio,omitempty"`
+	IsVerified   bool       `json:"is_verified"`
+	Role         string     `json:"role"`
+	IsBanned     bool       `json:"is_banned"`
+	BannedAt     *time.Time `json:"banned_at,omitempty"`
+	BannedBy     *uuid.UUID `json:"banned_by,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
 }
 
 type Repository struct {
@@ -41,10 +44,12 @@ func (r *Repository) Create(ctx context.Context, user *User) error {
 	query := `
 		INSERT INTO users (username, email, password_hash, full_name, role)
 		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, created_at, updated_at
+		RETURNING id, username, email, password_hash, full_name, avatar_url, 
+		          bio, is_verified, role, is_banned, banned_at, banned_by,
+		          created_at, updated_at
 	`
 
-	err := r.db.QueryRowContext(
+	return r.db.QueryRowContext(
 		ctx,
 		query,
 		user.Username,
@@ -52,17 +57,30 @@ func (r *Repository) Create(ctx context.Context, user *User) error {
 		user.PasswordHash,
 		user.FullName,
 		user.Role,
-	).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
-
-	return err
+	).Scan(
+		&user.ID,
+		&user.Username,
+		&user.Email,
+		&user.PasswordHash,
+		&user.FullName,
+		&user.AvatarURL,
+		&user.Bio,
+		&user.IsVerified,
+		&user.Role,
+		&user.IsBanned,
+		&user.BannedAt,
+		&user.BannedBy,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
 }
 
 func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	query := `
 		SELECT id, username, email, password_hash, full_name, avatar_url,
-		       bio, is_verified, role, created_at, updated_at
-		FROM users
-		WHERE id = $1
+		       bio, is_verified, role, is_banned, banned_at, banned_by,
+		       created_at, updated_at
+		FROM users WHERE id = $1
 	`
 
 	user := &User{}
@@ -76,6 +94,9 @@ func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
 		&user.Bio,
 		&user.IsVerified,
 		&user.Role,
+		&user.IsBanned,
+		&user.BannedAt,
+		&user.BannedBy,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -90,9 +111,9 @@ func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
 func (r *Repository) GetByEmail(ctx context.Context, email string) (*User, error) {
 	query := `
 		SELECT id, username, email, password_hash, full_name, avatar_url,
-		       bio, is_verified, role, created_at, updated_at
-		FROM users
-		WHERE email = $1
+		       bio, is_verified, role, is_banned, banned_at, banned_by,
+		       created_at, updated_at
+		FROM users WHERE email = $1
 	`
 
 	user := &User{}
@@ -106,6 +127,9 @@ func (r *Repository) GetByEmail(ctx context.Context, email string) (*User, error
 		&user.Bio,
 		&user.IsVerified,
 		&user.Role,
+		&user.IsBanned,
+		&user.BannedAt,
+		&user.BannedBy,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -155,7 +179,8 @@ func (r *Repository) ListWithPagination(ctx context.Context, offset, limit int) 
 
 	query := `
 		SELECT id, username, email, password_hash, full_name, avatar_url,
-		       bio, is_verified, role, created_at, updated_at
+		       bio, is_verified, role, is_banned, banned_at, banned_by,
+		       created_at, updated_at
 		FROM users
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
@@ -180,6 +205,9 @@ func (r *Repository) ListWithPagination(ctx context.Context, offset, limit int) 
 			&user.Bio,
 			&user.IsVerified,
 			&user.Role,
+			&user.IsBanned,
+			&user.BannedAt,
+			&user.BannedBy,
 			&user.CreatedAt,
 			&user.UpdatedAt,
 		)
@@ -194,4 +222,24 @@ func (r *Repository) ListWithPagination(ctx context.Context, offset, limit int) 
 	}
 
 	return users, total, nil
+}
+
+func (r *Repository) BanUser(ctx context.Context, userID, bannedBy uuid.UUID) error {
+	query := `
+		UPDATE users 
+		SET is_banned = TRUE, banned_at = NOW(), banned_by = $1
+		WHERE id = $2
+	`
+	_, err := r.db.ExecContext(ctx, query, bannedBy, userID)
+	return err
+}
+
+func (r *Repository) UnbanUser(ctx context.Context, userID uuid.UUID) error {
+	query := `
+		UPDATE users 
+		SET is_banned = FALSE, banned_at = NULL, banned_by = NULL
+		WHERE id = $1
+	`
+	_, err := r.db.ExecContext(ctx, query, userID)
+	return err
 }
