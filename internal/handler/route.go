@@ -67,6 +67,8 @@ func SetupRoutes(
 
 		// WALLPAPERS (Protected)
 		protected.Post("/wallpapers", wallpaperHandler.UploadWallpaper)
+		protected.Put("/wallpapers/:id", wallpaperHandler.UpdateWallpaper)
+		protected.Delete("/wallpapers/:id", wallpaperHandler.DeleteWallpaper)
 
 		// LIKES
 		protected.Post("/wallpapers/:id/like", wallpaperHandler.LikeWallpaper)
