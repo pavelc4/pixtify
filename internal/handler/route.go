@@ -84,11 +84,6 @@ func SetupRoutes(
 		// Moderator/Owner routes (content moderation - no separate dashboard)
 		moderator := protected.Group("", jwtMiddleware.RequireModeratorOrOwner())
 		{
-			// Reports management
-			moderator.Get("/reports", reportHandler.ListReports)
-			moderator.Get("/reports/:id", reportHandler.GetReport)
-			moderator.Put("/reports/:id/resolve", reportHandler.ResolveReport)
-
 			// User management
 			moderator.Post("/users/:id/ban", userHandler.BanUser)
 			moderator.Delete("/users/:id/ban", userHandler.UnbanUser)
