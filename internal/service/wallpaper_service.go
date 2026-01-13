@@ -148,3 +148,58 @@ func (s *WallpaperService) GetWallpaper(ctx context.Context, idStr string) (*wal
 	}
 	return s.repo.GetByID(ctx, id)
 }
+
+// UpdateWallpaper updates wallpaper metadata (owner only)
+func (s *WallpaperService) UpdateWallpaper(ctx context.Context, wallpaperIDStr, userIDStr string, title, description *string) error {
+	wallpaperID, err := uuid.Parse(wallpaperIDStr)
+	if err != nil {
+		return fmt.Errorf("invalid wallpaper ID")
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return fmt.Errorf("invalid user ID")
+	}
+
+	// Check if wallpaper exists and get owner
+	wp, err := s.repo.GetByID(ctx, wallpaperID)
+	if err != nil {
+		return fmt.Errorf("wallpaper not found")
+	}
+
+	// Check ownership
+	if wp.UserID != userID {
+		return fmt.Errorf("you don't own this wallpaper")
+	}
+
+	return s.repo.Update(ctx, wallpaperID, title, description)
+}
+
+// DeleteWallpaper soft deletes wallpaper (owner or moderator)
+func (s *WallpaperService) DeleteWallpaper(ctx context.Context, wallpaperIDStr, userIDStr, userRole string) error {
+	wallpaperID, err := uuid.Parse(wallpaperIDStr)
+	if err != nil {
+		return fmt.Errorf("invalid wallpaper ID")
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return fmt.Errorf("invalid user ID")
+	}
+
+	// Check if wallpaper exists
+	wp, err := s.repo.GetByID(ctx, wallpaperID)
+	if err != nil {
+		return fmt.Errorf("wallpaper not found")
+	}
+
+	// Check permissions: owner OR moderator/admin
+	isOwner := wp.UserID == userID
+	isModerator := userRole == "moderator" || userRole == "owner"
+
+	if !isOwner && !isModerator {
+		return fmt.Errorf("you don't have permission to delete this wallpaper")
+	}
+
+	return s.repo.SoftDelete(ctx, wallpaperID)
+}

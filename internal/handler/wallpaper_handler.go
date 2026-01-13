@@ -158,3 +158,47 @@ func (h *WallpaperHandler) GetMyLikes(c *fiber.Ctx) error {
 		},
 	})
 }
+
+func (h *WallpaperHandler) UpdateWallpaper(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+	wallpaperID := c.Params("id")
+
+	if _, err := uuid.Parse(wallpaperID); err != nil {
+		return badRequestError(c, "Invalid wallpaper ID")
+	}
+
+	var req struct {
+		Title       *string `json:"title"`
+		Description *string `json:"description"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return badRequestError(c, "Invalid request body")
+	}
+
+	if err := h.wallpaperService.UpdateWallpaper(c.Context(), wallpaperID, userID, req.Title, req.Description); err != nil {
+		return internalError(c, err.Error())
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Wallpaper updated successfully",
+	})
+}
+
+func (h *WallpaperHandler) DeleteWallpaper(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+	userRole := c.Locals("role").(string)
+	wallpaperID := c.Params("id")
+
+	if _, err := uuid.Parse(wallpaperID); err != nil {
+		return badRequestError(c, "Invalid wallpaper ID")
+	}
+
+	if err := h.wallpaperService.DeleteWallpaper(c.Context(), wallpaperID, userID, userRole); err != nil {
+		return internalError(c, err.Error())
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Wallpaper deleted successfully",
+	})
+}
