@@ -41,9 +41,7 @@ func SetupRoutes(
 		public.Get("/wallpapers", wallpaperHandler.ListWallpapers)
 		public.Get("/wallpapers/:id", wallpaperHandler.GetWallpaper)
 
-		// Public Collection Routes - specific paths BEFORE parameterized paths
-		public.Get("/collections/:id/wallpapers", collectionHandler.GetCollectionWallpapers)
-		public.Get("/collections/:id", collectionHandler.GetCollectionById)
+		// Public Collection Routes - these are now moved to protected
 	}
 
 	// Protected routes (Auth Required)
@@ -74,7 +72,9 @@ func SetupRoutes(
 		protected.Post("/wallpapers/:id/like", wallpaperHandler.LikeWallpaper)
 		protected.Get("/users/me/liked-wallpapers", wallpaperHandler.GetMyLikes)
 
-		// COLLECTIONS
+		// COLLECTIONS - specific paths BEFORE parameterized paths
+		protected.Get("/collections/:id/wallpapers", collectionHandler.GetCollectionWallpapers) // Moved from public
+		protected.Get("/collections/:id", collectionHandler.GetCollectionById)                  // Moved from public
 		protected.Post("/collections", collectionHandler.CreateCollection)
 		protected.Get("/collections/me", collectionHandler.GetMyCollections)
 		protected.Post("/collections/:id/wallpapers", collectionHandler.AddWallpaperToCollection)
@@ -84,11 +84,22 @@ func SetupRoutes(
 		// Moderator/Owner routes (content moderation - no separate dashboard)
 		moderator := protected.Group("", jwtMiddleware.RequireModeratorOrOwner())
 		{
+			// Reports management
+			moderator.Get("/reports", reportHandler.ListReports)
+			moderator.Get("/reports/:id", reportHandler.GetReport)
+			moderator.Put("/reports/:id/resolve", reportHandler.ResolveReport)
+
+			// User management
 			moderator.Post("/users/:id/ban", userHandler.BanUser)
-			moderator.Post("/users/:id/unban", userHandler.UnbanUser)
+			moderator.Delete("/users/:id/ban", userHandler.UnbanUser)
 			moderator.Get("/users/:id/stats", userHandler.GetUserStats)
 		}
 	}
+
+	// Public Collection Routes - placed after protected to avoid route conflicts
+	// Must be inside public group
+	public.Get("/collections/:id", collectionHandler.GetCollectionById)
+	public.Get("/collections/:id/wallpapers", collectionHandler.GetCollectionWallpapers)
 
 	// Health check
 	app.Get("/health", func(c *fiber.Ctx) error {
