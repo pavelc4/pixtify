@@ -10,11 +10,13 @@ import (
 
 type WallpaperHandler struct {
 	wallpaperService *service.WallpaperService
+	likeService      *service.LikeService
 }
 
-func NewWallpaperHandler(wallpaperService *service.WallpaperService) *WallpaperHandler {
+func NewWallpaperHandler(wallpaperService *service.WallpaperService, likeService *service.LikeService) *WallpaperHandler {
 	return &WallpaperHandler{
 		wallpaperService: wallpaperService,
+		likeService:      likeService,
 	}
 }
 
@@ -110,5 +112,49 @@ func (h *WallpaperHandler) GetWallpaper(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"data": wp,
+	})
+}
+
+func (h *WallpaperHandler) LikeWallpaper(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+	wallpaperID := c.Params("id")
+
+	if _, err := uuid.Parse(wallpaperID); err != nil {
+		return badRequestError(c, "Invalid wallpaper ID")
+	}
+
+	liked, err := h.likeService.ToggleLike(c.Context(), userID, wallpaperID)
+	if err != nil {
+		return internalError(c, err.Error())
+	}
+
+	action := "liked"
+	if !liked {
+		action = "unliked"
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Wallpaper " + action + " successfully",
+		"liked":   liked,
+	})
+}
+
+func (h *WallpaperHandler) GetMyLikes(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(string)
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	limit, _ := strconv.Atoi(c.Query("limit", "20"))
+
+	wallpapers, total, err := h.likeService.GetUserLikedWallpapers(c.Context(), userID, page, limit)
+	if err != nil {
+		return internalError(c, "Failed to fetch liked wallpapers")
+	}
+
+	return c.JSON(fiber.Map{
+		"data": wallpapers,
+		"meta": fiber.Map{
+			"page":  page,
+			"limit": limit,
+			"total": total,
+		},
 	})
 }

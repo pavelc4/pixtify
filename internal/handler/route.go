@@ -11,6 +11,7 @@ func SetupRoutes(
 	oauthHandler *OAuthHandler,
 	reportHandler *ReportHandler,
 	wallpaperHandler *WallpaperHandler,
+	collectionHandler *CollectionHandler,
 	jwtMiddleware *middleware.JWTMiddleware,
 	rateLimiter *middleware.RateLimiterMiddleware,
 ) {
@@ -62,6 +63,10 @@ func SetupRoutes(
 
 		// WALLPAPERS (Protected)
 		protected.Post("/wallpapers", wallpaperHandler.UploadWallpaper)
+
+		// LIKES
+		protected.Post("/wallpapers/:id/like", wallpaperHandler.LikeWallpaper)
+		protected.Get("/wallpapers/liked", wallpaperHandler.GetMyLikes)
 
 		// Moderator/Owner routes (content moderation - no separate dashboard)
 		moderator := protected.Group("", jwtMiddleware.RequireModeratorOrOwner())

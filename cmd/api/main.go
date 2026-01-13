@@ -17,6 +17,8 @@ import (
 	"github.com/pavelc4/pixtify/internal/processor"
 	"github.com/pavelc4/pixtify/internal/repository"
 	"github.com/pavelc4/pixtify/internal/repository/postgres"
+	"github.com/pavelc4/pixtify/internal/repository/postgres/collection"
+	"github.com/pavelc4/pixtify/internal/repository/postgres/like"
 	"github.com/pavelc4/pixtify/internal/repository/postgres/user"
 	"github.com/pavelc4/pixtify/internal/repository/postgres/wallpaper"
 	"github.com/pavelc4/pixtify/internal/service"
@@ -99,7 +101,17 @@ func main() {
 
 	wallpaperRepo := wallpaper.NewRepository(db)
 	wallpaperService := service.NewWallpaperService(wallpaperRepo, minioStorage, imageProcessor)
-	wallpaperHandler := handler.NewWallpaperHandler(wallpaperService)
+
+	// Like system
+	likeRepo := like.NewRepository(db)
+	likeService := service.NewLikeService(likeRepo, wallpaperRepo)
+
+	// Collection system
+	collectionRepo := collection.NewRepository(db)
+	collectionService := service.NewCollectionService(collectionRepo, wallpaperRepo)
+
+	wallpaperHandler := handler.NewWallpaperHandler(wallpaperService, likeService)
+	collectionHandler := handler.NewCollectionHandler(collectionService)
 	log.Println("Wallpaper system initialized")
 
 	jwtMiddleware := middleware.NewJWTMiddleware(jwtService)
@@ -116,7 +128,7 @@ func main() {
 
 	app.Use(recover.New())
 	app.Use(logger.New(logger.Config{
-		Format: "[${time}] ${status} - ${latency} ${method} ${path}\n",
+		Format: "[${time}] ${status} - ${latency} ${method} ${path}\\n",
 	}))
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "http://localhost:3000,http://localhost:5173",
@@ -125,7 +137,7 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	handler.SetupRoutes(app, userHandler, oauthHandler, reportHandler, wallpaperHandler, jwtMiddleware, rateLimiter)
+	handler.SetupRoutes(app, userHandler, oauthHandler, reportHandler, wallpaperHandler, collectionHandler, jwtMiddleware, rateLimiter)
 	log.Println("Routes configured")
 
 	port := fmt.Sprintf(":%s", cfg.Port)
