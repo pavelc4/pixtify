@@ -10,7 +10,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
 	github.com/minio/minio-go/v7 v7.0.97
-	golang.org/x/crypto v0.46.0
+	golang.org/x/crypto v0.47.0
 	golang.org/x/oauth2 v0.34.0
 )
 
@@ -37,8 +37,8 @@ require (
 	github.com/valyala/fasthttp v1.51.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	golang.org/x/image v0.18.0 // indirect
-	golang.org/x/net v0.47.0 // indirect
-	golang.org/x/sys v0.39.0 // indirect
-	golang.org/x/text v0.32.0 // indirect
+	golang.org/x/net v0.48.0 // indirect
+	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/text v0.33.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
