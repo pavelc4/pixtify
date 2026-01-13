@@ -40,6 +40,10 @@ func SetupRoutes(
 		// Public Wallpaper Routes
 		public.Get("/wallpapers", wallpaperHandler.ListWallpapers)
 		public.Get("/wallpapers/:id", wallpaperHandler.GetWallpaper)
+
+		// Public Collection Routes
+		public.Get("/collections/:id", collectionHandler.GetCollectionById)
+		public.Get("/collections/:id/wallpapers", collectionHandler.GetCollectionWallpapers)
 	}
 
 	// Protected routes (Auth Required)
