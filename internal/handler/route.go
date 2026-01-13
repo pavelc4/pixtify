@@ -70,7 +70,7 @@ func SetupRoutes(
 
 		// LIKES
 		protected.Post("/wallpapers/:id/like", wallpaperHandler.LikeWallpaper)
-		protected.Get("/wallpapers/liked", wallpaperHandler.GetMyLikes)
+		protected.Get("/users/me/liked-wallpapers", wallpaperHandler.GetMyLikes)
 
 		// COLLECTIONS
 		protected.Post("/collections", collectionHandler.CreateCollection)
