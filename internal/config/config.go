@@ -126,7 +126,12 @@ func getEnv(key, defaultValue string) string {
 	}
 	return defaultValue
 }
-func (d DatabaseConfig) GetDSN() string {
+
+func (d *DatabaseConfig) GetDSN() string {
+	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
+		return databaseURL
+	}
+
 	return fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		d.Host, d.Port, d.User, d.Password, d.Name, d.SSLMode,
