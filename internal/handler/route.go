@@ -68,6 +68,13 @@ func SetupRoutes(
 		protected.Post("/wallpapers/:id/like", wallpaperHandler.LikeWallpaper)
 		protected.Get("/wallpapers/liked", wallpaperHandler.GetMyLikes)
 
+		// COLLECTIONS
+		protected.Post("/collections", collectionHandler.CreateCollection)
+		protected.Get("/collections/me", collectionHandler.GetMyCollections)
+		protected.Post("/collections/:id/wallpapers", collectionHandler.AddWallpaperToCollection)
+		protected.Delete("/collections/:id/wallpapers/:wallpaperId", collectionHandler.RemoveWallpaperFromCollection)
+		protected.Delete("/collections/:id", collectionHandler.DeleteCollection)
+
 		// Moderator/Owner routes (content moderation - no separate dashboard)
 		moderator := protected.Group("", jwtMiddleware.RequireModeratorOrOwner())
 		{
