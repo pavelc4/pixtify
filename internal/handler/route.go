@@ -92,6 +92,11 @@ func SetupRoutes(
 
 			// Featured wallpapers management
 			moderator.Post("/wallpapers/:id/featured", wallpaperHandler.SetFeaturedStatus)
+
+			// Report management
+			moderator.Get("/reports", reportHandler.ListReports)
+			moderator.Get("/reports/:id", reportHandler.GetReportByID)
+			moderator.Put("/reports/:id", reportHandler.UpdateReportStatus)
 		}
 	}
 
