@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type Wallpaper struct {
@@ -194,4 +195,78 @@ func (r *Repository) SoftDelete(ctx context.Context, id uuid.UUID) error {
 	query := `UPDATE wallpapers SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`
 	_, err := r.db.ExecContext(ctx, query, id)
 	return err
+}
+func (r *Repository) GetByIDs(ctx context.Context, ids []uuid.UUID) ([]*Wallpaper, error) {
+	if len(ids) == 0 {
+		return []*Wallpaper{}, nil
+	}
+
+	// Build query with ANY for efficient bulk fetch
+	query := `
+		SELECT 
+			w.id, w.user_id, w.title, w.description, w.original_url, w.large_url, w.medium_url,
+			w.thumbnail_url, w.blurhash, w.width, w.height, w.file_size_bytes, w.mime_type,
+			w.view_count, w.download_count, w.like_count, w.status, w.is_featured,
+			w.created_at, w.updated_at,
+			u.username, u.avatar_url
+		FROM wallpapers w
+		INNER JOIN users u ON w.user_id = u.id
+		WHERE w.id = ANY($1) AND w.deleted_at IS NULL
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, pq.Array(ids))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Map for O(1) lookup when ordering results
+	wallpaperMap := make(map[uuid.UUID]*Wallpaper, len(ids))
+
+	for rows.Next() {
+		var w Wallpaper
+		var u User
+		var description sql.NullString
+		var blurhash sql.NullString
+		var avatarURL sql.NullString
+
+		err := rows.Scan(
+			&w.ID, &w.UserID, &w.Title, &description, &w.OriginalURL, &w.LargeURL, &w.MediumURL,
+			&w.ThumbnailURL, &blurhash, &w.Width, &w.Height, &w.FileSizeBytes, &w.MimeType,
+			&w.ViewCount, &w.DownloadCount, &w.LikeCount, &w.Status, &w.IsFeatured,
+			&w.CreatedAt, &w.UpdatedAt,
+			&u.Username, &avatarURL,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if description.Valid {
+			w.Description = &description.String
+		}
+		if blurhash.Valid {
+			w.Blurhash = &blurhash.String
+		}
+		if avatarURL.Valid {
+			u.AvatarURL = &avatarURL.String
+		}
+		u.ID = w.UserID
+		w.User = &u
+
+		wallpaperMap[w.ID] = &w
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Preserve input order (important for pagination)
+	result := make([]*Wallpaper, 0, len(ids))
+	for _, id := range ids {
+		if wp, ok := wallpaperMap[id]; ok {
+			result = append(result, wp)
+		}
+	}
+
+	return result, nil
 }

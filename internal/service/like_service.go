@@ -83,14 +83,10 @@ func (s *LikeService) GetUserLikedWallpapers(ctx context.Context, userIDStr stri
 		return []*wallpaper.Wallpaper{}, total, nil
 	}
 
-	// TODO: Implement bulk fetch method in wallpaper repository to avoid N+1 queries
-	var wallpapers []*wallpaper.Wallpaper
-	for _, id := range wallpaperIDs {
-		wp, err := s.wallpaperRepo.GetByID(ctx, id)
-		if err != nil {
-			continue
-		}
-		wallpapers = append(wallpapers, wp)
+	// Bulk fetch wallpapers in a single query (avoids N+1 problem)
+	wallpapers, err := s.wallpaperRepo.GetByIDs(ctx, wallpaperIDs)
+	if err != nil {
+		return nil, 0, err
 	}
 
 	return wallpapers, total, nil
