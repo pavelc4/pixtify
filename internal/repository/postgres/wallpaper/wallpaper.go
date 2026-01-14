@@ -270,3 +270,86 @@ func (r *Repository) GetByIDs(ctx context.Context, ids []uuid.UUID) ([]*Wallpape
 
 	return result, nil
 }
+
+// SetFeaturedStatus toggles the is_featured flag for a wallpaper (moderator action)
+func (r *Repository) SetFeaturedStatus(ctx context.Context, id uuid.UUID, isFeatured bool) error {
+	query := `
+		UPDATE wallpapers
+		SET is_featured = $1,
+		    updated_at = NOW()
+		WHERE id = $2 AND deleted_at IS NULL
+	`
+	result, err := r.db.ExecContext(ctx, query, isFeatured, id)
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
+}
+
+// ListFeatured retrieves all featured wallpapers
+func (r *Repository) ListFeatured(ctx context.Context, limit, offset int) ([]*Wallpaper, int, error) {
+	var total int
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM wallpapers WHERE is_featured = true AND deleted_at IS NULL`,
+	).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	query := `
+		SELECT 
+			w.id, w.user_id, w.title, w.thumbnail_url, w.width, w.height,
+			w.view_count, w.like_count, w.created_at,
+			u.username, u.avatar_url
+		FROM wallpapers w
+		INNER JOIN users u ON w.user_id = u.id
+		WHERE w.is_featured = true AND w.deleted_at IS NULL
+		ORDER BY w.created_at DESC
+		LIMIT $1 OFFSET $2
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var wallpapers []*Wallpaper
+
+	for rows.Next() {
+		var w Wallpaper
+		var u User
+		var avatarURL sql.NullString
+
+		if err := rows.Scan(
+			&w.ID, &w.UserID, &w.Title, &w.ThumbnailURL, &w.Width, &w.Height,
+			&w.ViewCount, &w.LikeCount, &w.CreatedAt,
+			&u.Username, &avatarURL,
+		); err != nil {
+			return nil, 0, err
+		}
+
+		if avatarURL.Valid {
+			u.AvatarURL = &avatarURL.String
+		}
+		u.ID = w.UserID
+		w.User = &u
+		wallpapers = append(wallpapers, &w)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	return wallpapers, total, nil
+}

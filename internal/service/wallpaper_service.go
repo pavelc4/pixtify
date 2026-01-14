@@ -239,3 +239,31 @@ func (s *WallpaperService) DeleteWallpaper(ctx context.Context, wallpaperIDStr, 
 
 	return s.repo.SoftDelete(ctx, wallpaperID)
 }
+
+// SetFeaturedStatus toggles featured status (moderator only)
+func (s *WallpaperService) SetFeaturedStatus(ctx context.Context, wallpaperIDStr string, isFeatured bool) error {
+	wallpaperID, err := uuid.Parse(wallpaperIDStr)
+	if err != nil {
+		return fmt.Errorf("invalid wallpaper ID")
+	}
+
+	// Verify wallpaper exists before updating
+	_, err = s.repo.GetByID(ctx, wallpaperID)
+	if err != nil {
+		return fmt.Errorf("wallpaper not found")
+	}
+
+	return s.repo.SetFeaturedStatus(ctx, wallpaperID, isFeatured)
+}
+
+// ListFeaturedWallpapers retrieves all featured wallpapers with pagination
+func (s *WallpaperService) ListFeaturedWallpapers(ctx context.Context, page, limit int) ([]*wallpaper.Wallpaper, int, error) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 50 {
+		limit = 20
+	}
+	offset := (page - 1) * limit
+	return s.repo.ListFeatured(ctx, limit, offset)
+}

@@ -206,3 +206,53 @@ func (h *WallpaperHandler) DeleteWallpaper(c *fiber.Ctx) error {
 		"message": "Wallpaper deleted successfully",
 	})
 }
+
+// SetFeaturedStatus toggles featured status (moderator only)
+func (h *WallpaperHandler) SetFeaturedStatus(c *fiber.Ctx) error {
+	wallpaperID := c.Params("id")
+
+	if _, err := uuid.Parse(wallpaperID); err != nil {
+		return badRequestError(c, "Invalid wallpaper ID")
+	}
+
+	var req struct {
+		IsFeatured bool `json:"is_featured"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return badRequestError(c, "Invalid request body")
+	}
+
+	if err := h.wallpaperService.SetFeaturedStatus(c.Context(), wallpaperID, req.IsFeatured); err != nil {
+		return internalError(c, err.Error())
+	}
+
+	action := "featured"
+	if !req.IsFeatured {
+		action = "unfeatured"
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Wallpaper " + action + " successfully",
+	})
+}
+
+// ListFeaturedWallpapers retrieves all featured wallpapers (public endpoint)
+func (h *WallpaperHandler) ListFeaturedWallpapers(c *fiber.Ctx) error {
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	limit, _ := strconv.Atoi(c.Query("limit", "20"))
+
+	wallpapers, total, err := h.wallpaperService.ListFeaturedWallpapers(c.Context(), page, limit)
+	if err != nil {
+		return internalError(c, "Failed to fetch featured wallpapers")
+	}
+
+	return c.JSON(fiber.Map{
+		"data": wallpapers,
+		"meta": fiber.Map{
+			"page":  page,
+			"limit": limit,
+			"total": total,
+		},
+	})
+}

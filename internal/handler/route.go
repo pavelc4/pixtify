@@ -39,6 +39,7 @@ func SetupRoutes(
 
 		// Public Wallpaper Routes
 		public.Get("/wallpapers", wallpaperHandler.ListWallpapers)
+		public.Get("/wallpapers/featured", wallpaperHandler.ListFeaturedWallpapers)
 		public.Get("/wallpapers/:id", wallpaperHandler.GetWallpaper)
 
 		// Public Collection Routes - these are now moved to protected
@@ -88,6 +89,9 @@ func SetupRoutes(
 			moderator.Post("/users/:id/ban", userHandler.BanUser)
 			moderator.Delete("/users/:id/ban", userHandler.UnbanUser)
 			moderator.Get("/users/:id/stats", userHandler.GetUserStats)
+
+			// Featured wallpapers management
+			moderator.Post("/wallpapers/:id/featured", wallpaperHandler.SetFeaturedStatus)
 		}
 	}
 
