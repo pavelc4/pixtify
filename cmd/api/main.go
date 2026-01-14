@@ -68,12 +68,7 @@ func main() {
 		refreshTokenRepo,
 		cfg.CookieSecret,
 	)
-	log.Println("Handlers initialized")
-
-	reportRepo := repository.NewReportRepository(db)
-	reportService := service.NewReportService(reportRepo)
-	reportHandler := handler.NewReportHandler(reportService, userService)
-	log.Println("Report handlers initialized")
+	log.Println("User handlers initialized")
 
 	// Wallpaper System
 	imageProcessor := processor.NewImageProcessor()
@@ -109,6 +104,12 @@ func main() {
 	// Collection system
 	collectionRepo := collection.NewRepository(db)
 	collectionService := service.NewCollectionService(collectionRepo, wallpaperRepo)
+
+	// Report system (needs wallpaperService for fetching wallpaper data)
+	reportRepo := repository.NewReportRepository(db)
+	reportService := service.NewReportService(reportRepo)
+	reportHandler := handler.NewReportHandler(reportService, userService, wallpaperService)
+	log.Println("Report handlers initialized")
 
 	wallpaperHandler := handler.NewWallpaperHandler(wallpaperService, likeService)
 	collectionHandler := handler.NewCollectionHandler(collectionService)

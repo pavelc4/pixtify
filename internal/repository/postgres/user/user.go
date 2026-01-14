@@ -243,3 +243,39 @@ func (r *Repository) UnbanUser(ctx context.Context, userID uuid.UUID) error {
 	_, err := r.db.ExecContext(ctx, query, userID)
 	return err
 }
+
+// UserStats holds aggregated statistics for a user
+type UserStats struct {
+	WallpaperCount int `json:"wallpaper_count"`
+	LikesReceived  int `json:"likes_received"`
+	ReportsCount   int `json:"reports_count"`
+}
+
+// GetUserStats retrieves aggregated statistics for a user
+func (r *Repository) GetUserStats(ctx context.Context, userID uuid.UUID) (*UserStats, error) {
+	stats := &UserStats{}
+
+	// Count user's wallpapers
+	wallpaperQuery := `SELECT COUNT(*) FROM wallpapers WHERE user_id = $1 AND deleted_at IS NULL`
+	if err := r.db.QueryRowContext(ctx, wallpaperQuery, userID).Scan(&stats.WallpaperCount); err != nil {
+		return nil, err
+	}
+
+	// Count total likes received on user's wallpapers
+	likesQuery := `
+		SELECT COALESCE(SUM(w.like_count), 0)
+		FROM wallpapers w
+		WHERE w.user_id = $1 AND w.deleted_at IS NULL
+	`
+	if err := r.db.QueryRowContext(ctx, likesQuery, userID).Scan(&stats.LikesReceived); err != nil {
+		return nil, err
+	}
+
+	// Count reports made by this user
+	reportsQuery := `SELECT COUNT(*) FROM reports WHERE reporter_id = $1`
+	if err := r.db.QueryRowContext(ctx, reportsQuery, userID).Scan(&stats.ReportsCount); err != nil {
+		return nil, err
+	}
+
+	return stats, nil
+}

@@ -8,14 +8,16 @@ import (
 )
 
 type ReportHandler struct {
-	reportService *service.ReportService
-	userService   *service.UserService
+	reportService    *service.ReportService
+	userService      *service.UserService
+	wallpaperService *service.WallpaperService
 }
 
-func NewReportHandler(reportService *service.ReportService, userService *service.UserService) *ReportHandler {
+func NewReportHandler(reportService *service.ReportService, userService *service.UserService, wallpaperService *service.WallpaperService) *ReportHandler {
 	return &ReportHandler{
-		reportService: reportService,
-		userService:   userService,
+		reportService:    reportService,
+		userService:      userService,
+		wallpaperService: wallpaperService,
 	}
 }
 
@@ -38,14 +40,18 @@ func (h *ReportHandler) CreateReport(c *fiber.Ctx) error {
 		return unauthorizedError(c, "User not found")
 	}
 
-	// Create report with placeholder wallpaper data
-	// TODO: Replace with actual wallpaper lookup when wallpapers table is implemented
+	// Fetch actual wallpaper data from database
+	wallpaper, err := h.wallpaperService.GetWallpaper(c.Context(), req.WallpaperID.String())
+	if err != nil {
+		return notFoundError(c, "Wallpaper not found")
+	}
+
 	report := models.Report{
 		ID:               uuid.New(),
 		WallpaperID:      req.WallpaperID,
 		ReporterID:       userID,
-		WallpaperTitle:   "Sample Wallpaper",
-		WallpaperURL:     "https://via.placeholder.com/400",
+		WallpaperTitle:   wallpaper.Title,
+		WallpaperURL:     wallpaper.ThumbnailURL,
 		ReporterUsername: user.Username,
 		Reason:           req.Reason,
 		Status:           "pending",

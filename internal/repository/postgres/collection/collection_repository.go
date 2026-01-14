@@ -120,53 +120,93 @@ func (r *Repository) Delete(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
-// AddWallpaper adds a wallpaper to a collection
+// AddWallpaper adds a wallpaper to a collection atomically using transaction
 func (r *Repository) AddWallpaper(ctx context.Context, collectionID, wallpaperID uuid.UUID) error {
-	// TODO: Use transaction to update wallpaper_count atomically
-	query := `
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Insert collection item
+	insertQuery := `
 		INSERT INTO collection_items (collection_id, wallpaper_id)
 		VALUES ($1, $2)
 		ON CONFLICT (collection_id, wallpaper_id) DO NOTHING
 	`
-	_, err := r.db.ExecContext(ctx, query, collectionID, wallpaperID)
+	result, err := tx.ExecContext(ctx, insertQuery, collectionID, wallpaperID)
 	if err != nil {
 		return err
 	}
 
-	// Update wallpaper count
-	updateCountQuery := `
-		UPDATE collections
-		SET wallpaper_count = (
-			SELECT COUNT(*) FROM collection_items WHERE collection_id = $1
-		)
-		WHERE id = $1
-	`
-	_, err = r.db.ExecContext(ctx, updateCountQuery, collectionID)
-	return err
+	// Only update count if a row was actually inserted
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected > 0 {
+		// Update wallpaper count
+		updateCountQuery := `
+			UPDATE collections
+			SET wallpaper_count = wallpaper_count + 1, updated_at = NOW()
+			WHERE id = $1
+		`
+		_, err = tx.ExecContext(ctx, updateCountQuery, collectionID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
-// RemoveWallpaper removes a wallpaper from a collection
+// RemoveWallpaper removes a wallpaper from a collection atomically using transaction
 func (r *Repository) RemoveWallpaper(ctx context.Context, collectionID, wallpaperID uuid.UUID) error {
-	// TODO: Use transaction to update wallpaper_count atomically
-	query := `
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Delete collection item
+	deleteQuery := `
 		DELETE FROM collection_items
 		WHERE collection_id = $1 AND wallpaper_id = $2
 	`
-	_, err := r.db.ExecContext(ctx, query, collectionID, wallpaperID)
+	result, err := tx.ExecContext(ctx, deleteQuery, collectionID, wallpaperID)
 	if err != nil {
 		return err
 	}
 
-	// Update wallpaper count
-	updateCountQuery := `
-		UPDATE collections
-		SET wallpaper_count = (
-			SELECT COUNT(*) FROM collection_items WHERE collection_id = $1
-		)
-		WHERE id = $1
-	`
-	_, err = r.db.ExecContext(ctx, updateCountQuery, collectionID)
-	return err
+	// Only update count if a row was actually deleted
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected > 0 {
+		// Update wallpaper count
+		updateCountQuery := `
+			UPDATE collections
+			SET wallpaper_count = wallpaper_count - 1, updated_at = NOW()
+			WHERE id = $1 AND wallpaper_count > 0
+		`
+		_, err = tx.ExecContext(ctx, updateCountQuery, collectionID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
 // GetCollectionWallpapers retrieves all wallpapers in a collection

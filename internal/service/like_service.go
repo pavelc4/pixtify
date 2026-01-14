@@ -39,23 +39,8 @@ func (s *LikeService) ToggleLike(ctx context.Context, userIDStr, wallpaperIDStr 
 		return false, fmt.Errorf("wallpaper not found")
 	}
 
-	// Toggle like
-	liked, err := s.likeRepo.ToggleLike(ctx, userID, wallpaperID)
-	if err != nil {
-		return false, err
-	}
-
-	// Update like count
-	delta := 1
-	if !liked {
-		delta = -1
-	}
-	if err := s.likeRepo.IncrementWallpaperLikeCount(ctx, wallpaperID, delta); err != nil {
-		// TODO: Consider using transaction to rollback like insert/delete if count update fails
-		return liked, err
-	}
-
-	return liked, nil
+	// Use transaction to toggle like and update count atomically
+	return s.likeRepo.ToggleLikeWithTx(ctx, userID, wallpaperID)
 }
 
 // CheckLikeStatus checks if user has liked a wallpaper

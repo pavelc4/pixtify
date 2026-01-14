@@ -207,15 +207,22 @@ func (s *UserService) GetUserStats(ctx context.Context, userID uuid.UUID) (map[s
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 
-	// Basic user stats (can be extended with wallpaper counts, likes, etc)
+	// Get aggregated stats from database
+	aggregatedStats, err := s.repo.GetUserStats(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user stats: %w", err)
+	}
+
 	stats := map[string]interface{}{
-		"user_id":     user.ID,
-		"username":    user.Username,
-		"role":        user.Role,
-		"is_verified": user.IsVerified,
-		"is_banned":   user.IsBanned,
-		"created_at":  user.CreatedAt,
-		// TODO: Add wallpaper_count, likes_count, reports_count when tables exist
+		"user_id":         user.ID,
+		"username":        user.Username,
+		"role":            user.Role,
+		"is_verified":     user.IsVerified,
+		"is_banned":       user.IsBanned,
+		"created_at":      user.CreatedAt,
+		"wallpaper_count": aggregatedStats.WallpaperCount,
+		"likes_received":  aggregatedStats.LikesReceived,
+		"reports_count":   aggregatedStats.ReportsCount,
 	}
 
 	if user.BannedAt != nil {

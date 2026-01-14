@@ -43,6 +43,58 @@ func (r *Repository) ToggleLike(ctx context.Context, userID, wallpaperID uuid.UU
 	_, err = r.db.ExecContext(ctx, insertQuery, userID, wallpaperID)
 	return true, err
 }
+func (r *Repository) ToggleLikeWithTx(ctx context.Context, userID, wallpaperID uuid.UUID) (liked bool, err error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
+	var exists bool
+	checkQuery := `SELECT EXISTS(SELECT 1 FROM likes WHERE user_id = $1 AND wallpaper_id = $2)`
+	err = tx.QueryRowContext(ctx, checkQuery, userID, wallpaperID).Scan(&exists)
+	if err != nil {
+		return false, err
+	}
+
+	var delta int
+	if exists {
+		// Remove like
+		deleteQuery := `DELETE FROM likes WHERE user_id = $1 AND wallpaper_id = $2`
+		_, err = tx.ExecContext(ctx, deleteQuery, userID, wallpaperID)
+		if err != nil {
+			return false, err
+		}
+		liked = false
+		delta = -1
+	} else {
+		// Add like
+		insertQuery := `INSERT INTO likes (user_id, wallpaper_id) VALUES ($1, $2)`
+		_, err = tx.ExecContext(ctx, insertQuery, userID, wallpaperID)
+		if err != nil {
+			return false, err
+		}
+		liked = true
+		delta = 1
+	}
+
+	// Update wallpaper like_count atomically within the same transaction
+	updateQuery := `UPDATE wallpapers SET like_count = like_count + $1 WHERE id = $2`
+	_, err = tx.ExecContext(ctx, updateQuery, delta, wallpaperID)
+	if err != nil {
+		return false, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return false, err
+	}
+
+	return liked, nil
+}
 
 func (r *Repository) IsLiked(ctx context.Context, userID, wallpaperID uuid.UUID) (bool, error) {
 	var exists bool
