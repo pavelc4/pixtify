@@ -8,10 +8,10 @@ CREATE TABLE wallpapers (
     description TEXT,
     
     original_url TEXT NOT NULL,
-    large_url TEXT NOT NULL,
-    medium_url TEXT NOT NULL,
+    image_url TEXT NOT NULL,
     thumbnail_url TEXT NOT NULL,
     blurhash VARCHAR(100),
+    device_type VARCHAR(20) NOT NULL DEFAULT 'desktop',
     
     width INTEGER NOT NULL,
     height INTEGER NOT NULL,

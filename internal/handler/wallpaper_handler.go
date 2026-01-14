@@ -59,11 +59,15 @@ func (h *WallpaperHandler) UploadWallpaper(c *fiber.Ctx) error {
 
 	contentType := file.Header.Get("Content-Type")
 
+	// Get Device Type (optional, default handled in service)
+	deviceType := c.FormValue("device_type")
+
 	// Call Service
 	input := service.CreateWallpaperInput{
 		UserID:      userID,
 		Title:       title,
 		Description: description,
+		DeviceType:  deviceType,
 		ImageData:   fileData,
 		ContentType: contentType,
 		Tags:        tags,

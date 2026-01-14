@@ -78,3 +78,40 @@ func (p *ImageProcessor) GenerateThumbnail(data []byte, width, height int) ([]by
 
 	return buf.Bytes(), nil
 }
+
+func (p *ImageProcessor) ResizeForMobile(data []byte, maxWidth int, format string) ([]byte, error) {
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	bounds := img.Bounds()
+	origWidth := bounds.Dx()
+
+	// If image is already smaller, return nil to indicate no resize needed
+	if origWidth <= maxWidth {
+		return nil, nil
+	}
+
+	resized := imaging.Resize(img, maxWidth, 0, imaging.Lanczos)
+
+	buf := new(bytes.Buffer)
+
+	switch format {
+	case "jpeg":
+		if err := imaging.Encode(buf, resized, imaging.JPEG, imaging.JPEGQuality(100)); err != nil {
+			return nil, err
+		}
+	case "png":
+		if err := imaging.Encode(buf, resized, imaging.PNG); err != nil {
+			return nil, err
+		}
+	default:
+		// Fallback to JPEG with max quality
+		if err := imaging.Encode(buf, resized, imaging.JPEG, imaging.JPEGQuality(100)); err != nil {
+			return nil, err
+		}
+	}
+
+	return buf.Bytes(), nil
+}

@@ -15,10 +15,10 @@ type Wallpaper struct {
 	Title         string    `json:"title"`
 	Description   *string   `json:"description,omitempty"`
 	OriginalURL   string    `json:"original_url"`
-	LargeURL      string    `json:"large_url"`
-	MediumURL     string    `json:"medium_url"`
+	ImageURL      string    `json:"image_url"`
 	ThumbnailURL  string    `json:"thumbnail_url"`
 	Blurhash      *string   `json:"blurhash,omitempty"`
+	DeviceType    string    `json:"device_type"`
 	Width         int       `json:"width"`
 	Height        int       `json:"height"`
 	FileSizeBytes int64     `json:"file_size_bytes"`
@@ -53,8 +53,8 @@ func NewRepository(db *sql.DB) *Repository {
 func (r *Repository) Create(ctx context.Context, w *Wallpaper) error {
 	query := `
 		INSERT INTO wallpapers (
-			user_id, title, description, original_url, large_url, medium_url,
-			thumbnail_url, blurhash, width, height, file_size_bytes, mime_type,
+			user_id, title, description, original_url, image_url,
+			thumbnail_url, blurhash, device_type, width, height, file_size_bytes, mime_type,
 			status, is_featured
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 		RETURNING id, view_count, download_count, like_count, created_at, updated_at
@@ -62,16 +62,16 @@ func (r *Repository) Create(ctx context.Context, w *Wallpaper) error {
 
 	return r.db.QueryRowContext(
 		ctx, query,
-		w.UserID, w.Title, w.Description, w.OriginalURL, w.LargeURL, w.MediumURL,
-		w.ThumbnailURL, w.Blurhash, w.Width, w.Height, w.FileSizeBytes, w.MimeType,
+		w.UserID, w.Title, w.Description, w.OriginalURL, w.ImageURL,
+		w.ThumbnailURL, w.Blurhash, w.DeviceType, w.Width, w.Height, w.FileSizeBytes, w.MimeType,
 		w.Status, w.IsFeatured,
 	).Scan(&w.ID, &w.ViewCount, &w.DownloadCount, &w.LikeCount, &w.CreatedAt, &w.UpdatedAt)
 }
 
 func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*Wallpaper, error) {
 	query := `
-		SELECT id, user_id, title, description, original_url, large_url, medium_url,
-		       thumbnail_url, blurhash, width, height, file_size_bytes, mime_type,
+		SELECT id, user_id, title, description, original_url, image_url,
+		       thumbnail_url, blurhash, device_type, width, height, file_size_bytes, mime_type,
 		       view_count, download_count, like_count, status, is_featured,
 		       created_at, updated_at
 		FROM wallpapers
@@ -83,8 +83,8 @@ func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*Wallpaper, err
 	var blurhash sql.NullString
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&w.ID, &w.UserID, &w.Title, &description, &w.OriginalURL, &w.LargeURL, &w.MediumURL,
-		&w.ThumbnailURL, &blurhash, &w.Width, &w.Height, &w.FileSizeBytes, &w.MimeType,
+		&w.ID, &w.UserID, &w.Title, &description, &w.OriginalURL, &w.ImageURL,
+		&w.ThumbnailURL, &blurhash, &w.DeviceType, &w.Width, &w.Height, &w.FileSizeBytes, &w.MimeType,
 		&w.ViewCount, &w.DownloadCount, &w.LikeCount, &w.Status, &w.IsFeatured,
 		&w.CreatedAt, &w.UpdatedAt,
 	)
@@ -204,8 +204,8 @@ func (r *Repository) GetByIDs(ctx context.Context, ids []uuid.UUID) ([]*Wallpape
 	// Build query with ANY for efficient bulk fetch
 	query := `
 		SELECT 
-			w.id, w.user_id, w.title, w.description, w.original_url, w.large_url, w.medium_url,
-			w.thumbnail_url, w.blurhash, w.width, w.height, w.file_size_bytes, w.mime_type,
+			w.id, w.user_id, w.title, w.description, w.original_url, w.image_url,
+			w.thumbnail_url, w.blurhash, w.device_type, w.width, w.height, w.file_size_bytes, w.mime_type,
 			w.view_count, w.download_count, w.like_count, w.status, w.is_featured,
 			w.created_at, w.updated_at,
 			u.username, u.avatar_url
@@ -231,8 +231,8 @@ func (r *Repository) GetByIDs(ctx context.Context, ids []uuid.UUID) ([]*Wallpape
 		var avatarURL sql.NullString
 
 		err := rows.Scan(
-			&w.ID, &w.UserID, &w.Title, &description, &w.OriginalURL, &w.LargeURL, &w.MediumURL,
-			&w.ThumbnailURL, &blurhash, &w.Width, &w.Height, &w.FileSizeBytes, &w.MimeType,
+			&w.ID, &w.UserID, &w.Title, &description, &w.OriginalURL, &w.ImageURL,
+			&w.ThumbnailURL, &blurhash, &w.DeviceType, &w.Width, &w.Height, &w.FileSizeBytes, &w.MimeType,
 			&w.ViewCount, &w.DownloadCount, &w.LikeCount, &w.Status, &w.IsFeatured,
 			&w.CreatedAt, &w.UpdatedAt,
 			&u.Username, &avatarURL,
