@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/google/uuid"
@@ -43,13 +42,14 @@ type CreateWallpaperInput struct {
 	UserID      string
 	Title       string
 	Description string
+	DeviceType  string // "mobile" or "desktop"
 	ImageData   []byte
 	ContentType string
-	Tags        []string
+	Tags        []string // keywords for search
 }
 
 func (s *WallpaperService) CreateWallpaper(ctx context.Context, input CreateWallpaperInput) (*wallpaper.Wallpaper, error) {
-	//  Validate Image
+	// Validate Image
 	info, err := s.processor.ValidateImage(input.ImageData, input.ContentType)
 	if err != nil {
 		return nil, fmt.Errorf("invalid image: %w", err)
@@ -60,47 +60,54 @@ func (s *WallpaperService) CreateWallpaper(ctx context.Context, input CreateWall
 		return nil, fmt.Errorf("invalid user ID")
 	}
 
-	wallpaperID := uuid.New()
-	ext := filepath.Ext("image." + info.Format)
-	if info.Format == "jpeg" {
-		ext = ".jpg"
+	// Validate device type
+	deviceType := input.DeviceType
+	if deviceType != "mobile" && deviceType != "desktop" {
+		deviceType = "desktop" // default
 	}
+
+	wallpaperID := uuid.New()
+	slug := slugify(input.Title)
+	if slug == "" {
+		slug = wallpaperID.String()[:8]
+	}
+
+	ext := ".jpg"
 	if info.Format == "png" {
 		ext = ".png"
-	}
-	if info.Format == "webp" {
+	} else if info.Format == "webp" {
 		ext = ".webp"
 	}
 
-	//  Upload Original
-	originalKey := fmt.Sprintf("%s/original%s", wallpaperID, ext)
-	originalURL, err := s.storage.Upload(ctx, s.bucketOrigin, originalKey, bytes.NewReader(input.ImageData), int64(len(input.ImageData)), input.ContentType)
+	// Upload Original Image (no compression, full quality)
+	imageKey := fmt.Sprintf("%s/%s%s", wallpaperID, slug, ext)
+	imageURL, err := s.storage.Upload(ctx, s.bucketOrigin, imageKey, bytes.NewReader(input.ImageData), int64(len(input.ImageData)), input.ContentType)
 	if err != nil {
-		return nil, fmt.Errorf("failed to upload original: %w", err)
+		return nil, fmt.Errorf("failed to upload image: %w", err)
 	}
 
-	//  Generate & Upload Thumbnails
+	// Generate & Upload Thumbnail (compressed for fast loading)
 	thumbData, err := s.processor.GenerateThumbnail(input.ImageData, 400, 400)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate thumbnail: %w", err)
 	}
 
-	thumbKey := fmt.Sprintf("%s/thumbnail.jpg", wallpaperID)
+	thumbKey := fmt.Sprintf("%s/%s_thumb.jpg", wallpaperID, slug)
 	thumbURL, err := s.storage.Upload(ctx, s.bucketThumb, thumbKey, bytes.NewReader(thumbData), int64(len(thumbData)), "image/jpeg")
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload thumbnail: %w", err)
 	}
 
-	//  Save Metadata
+	// Save Metadata
 	wp := &wallpaper.Wallpaper{
 		ID:            wallpaperID,
 		UserID:        userUUID,
 		Title:         input.Title,
 		Description:   &input.Description,
-		OriginalURL:   originalURL,
-		LargeURL:      originalURL, // Todo: implement distinct sizes
-		MediumURL:     originalURL, // Todo: implement distinct sizes
+		OriginalURL:   imageURL,
+		ImageURL:      imageURL,
 		ThumbnailURL:  thumbURL,
+		DeviceType:    deviceType,
 		Width:         info.Width,
 		Height:        info.Height,
 		FileSizeBytes: int64(len(input.ImageData)),
@@ -113,7 +120,7 @@ func (s *WallpaperService) CreateWallpaper(ctx context.Context, input CreateWall
 		return nil, fmt.Errorf("failed to create wallpaper record: %w", err)
 	}
 
-	// 5. Save Tags
+	// Save Tags (keywords for search)
 	if len(input.Tags) > 0 {
 		var cleanTags []string
 		for _, t := range input.Tags {
@@ -128,6 +135,35 @@ func (s *WallpaperService) CreateWallpaper(ctx context.Context, input CreateWall
 	}
 
 	return wp, nil
+}
+
+// slugify converts title to URL-safe slug
+func slugify(title string) string {
+	// Simple slugify: lowercase, replace spaces with hyphens, remove special chars
+	slug := strings.ToLower(title)
+	slug = strings.ReplaceAll(slug, " ", "-")
+
+	// Keep only alphanumeric and hyphens
+	var result strings.Builder
+	for _, r := range slug {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+			result.WriteRune(r)
+		}
+	}
+
+	// Trim leading/trailing hyphens and collapse multiple hyphens
+	slug = result.String()
+	for strings.Contains(slug, "--") {
+		slug = strings.ReplaceAll(slug, "--", "-")
+	}
+	slug = strings.Trim(slug, "-")
+
+	// Limit length
+	if len(slug) > 50 {
+		slug = slug[:50]
+	}
+
+	return slug
 }
 
 func (s *WallpaperService) ListWallpapers(ctx context.Context, page, limit int) ([]*wallpaper.Wallpaper, int, error) {
