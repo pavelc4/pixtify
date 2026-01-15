@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"time"
@@ -85,18 +84,17 @@ func main() {
 	if err != nil {
 		log.Printf("Warning: Failed to initialize MinIO storage: %v. Wallpaper uploads will fail.", err)
 	} else {
-		// buckets
-		buckets := []string{cfg.Storage.BucketOriginals, cfg.Storage.BucketThumbnails}
-		err = minioStorage.InitializeBuckets(context.Background(), buckets)
-		if err != nil {
-			log.Printf("Warning: Failed to initialize MinIO buckets: %v", err)
-		} else {
-			log.Println("MinIO buckets initialized and policies set")
-		}
+		log.Println("R2 Storage connected (buckets managed via Cloudflare Dashboard)")
 	}
 
 	wallpaperRepo := wallpaper.NewRepository(db)
-	wallpaperService := service.NewWallpaperService(wallpaperRepo, minioStorage, imageProcessor)
+	wallpaperService := service.NewWallpaperService(
+		wallpaperRepo,
+		minioStorage,
+		imageProcessor,
+		cfg.Storage.BucketOriginals,
+		cfg.Storage.BucketThumbnails,
+	)
 
 	// Like system
 	likeRepo := like.NewRepository(db)

@@ -28,13 +28,13 @@ func SplitTags(tags string) []string {
 	return strings.Split(tags, ",")
 }
 
-func NewWallpaperService(repo *wallpaper.Repository, storage storage.Service, processor *processor.ImageProcessor) *WallpaperService {
+func NewWallpaperService(repo *wallpaper.Repository, storage storage.Service, processor *processor.ImageProcessor, bucketOrigin, bucketThumb string) *WallpaperService {
 	return &WallpaperService{
 		repo:         repo,
 		storage:      storage,
 		processor:    processor,
-		bucketOrigin: "pixtify-originals",
-		bucketThumb:  "pixtify-thumbnails",
+		bucketOrigin: bucketOrigin,
+		bucketThumb:  bucketThumb,
 	}
 }
 
