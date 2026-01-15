@@ -256,3 +256,105 @@ func (h *WallpaperHandler) ListFeaturedWallpapers(c *fiber.Ctx) error {
 		},
 	})
 }
+
+// SearchWallpapers searches wallpapers by query (public endpoint)
+func (h *WallpaperHandler) SearchWallpapers(c *fiber.Ctx) error {
+	query := c.Query("q")
+	if query == "" {
+		return badRequestError(c, "Search query is required")
+	}
+
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	limit, _ := strconv.Atoi(c.Query("limit", "20"))
+
+	wallpapers, total, err := h.wallpaperService.SearchWallpapers(c.Context(), query, page, limit)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"data": wallpapers,
+		"meta": fiber.Map{
+			"page":  page,
+			"limit": limit,
+			"total": total,
+			"query": query,
+		},
+	})
+}
+
+// GetWallpapersByTag filters wallpapers by tag slug (public endpoint)
+func (h *WallpaperHandler) GetWallpapersByTag(c *fiber.Ctx) error {
+	tagSlug := c.Query("tag")
+	if tagSlug == "" {
+		return badRequestError(c, "Tag slug is required")
+	}
+
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	limit, _ := strconv.Atoi(c.Query("limit", "20"))
+
+	wallpapers, total, err := h.wallpaperService.GetWallpapersByTag(c.Context(), tagSlug, page, limit)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"data": wallpapers,
+		"meta": fiber.Map{
+			"page":  page,
+			"limit": limit,
+			"total": total,
+			"tag":   tagSlug,
+		},
+	})
+}
+
+// GetUserWallpapers retrieves wallpapers uploaded by a specific user (public endpoint)
+func (h *WallpaperHandler) GetUserWallpapers(c *fiber.Ctx) error {
+	userID := c.Params("id")
+	if _, err := uuid.Parse(userID); err != nil {
+		return badRequestError(c, "Invalid user ID")
+	}
+
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	limit, _ := strconv.Atoi(c.Query("limit", "20"))
+
+	wallpapers, total, err := h.wallpaperService.GetUserWallpapers(c.Context(), userID, page, limit)
+	if err != nil {
+		return internalError(c, err.Error())
+	}
+
+	return c.JSON(fiber.Map{
+		"data": wallpapers,
+		"meta": fiber.Map{
+			"page":    page,
+			"limit":   limit,
+			"total":   total,
+			"user_id": userID,
+		},
+	})
+}
+
+// GetTrendingWallpapers retrieves trending wallpapers (public endpoint)
+func (h *WallpaperHandler) GetTrendingWallpapers(c *fiber.Ctx) error {
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	limit, _ := strconv.Atoi(c.Query("limit", "20"))
+
+	wallpapers, total, err := h.wallpaperService.GetTrendingWallpapers(c.Context(), page, limit)
+	if err != nil {
+		return internalError(c, "Failed to fetch trending wallpapers")
+	}
+
+	return c.JSON(fiber.Map{
+		"data": wallpapers,
+		"meta": fiber.Map{
+			"page":  page,
+			"limit": limit,
+			"total": total,
+		},
+	})
+}

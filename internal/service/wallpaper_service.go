@@ -267,3 +267,79 @@ func (s *WallpaperService) ListFeaturedWallpapers(ctx context.Context, page, lim
 	offset := (page - 1) * limit
 	return s.repo.ListFeatured(ctx, limit, offset)
 }
+
+// SearchWallpapers performs full-text search on wallpapers
+func (s *WallpaperService) SearchWallpapers(ctx context.Context, query string, page, limit int) ([]*wallpaper.Wallpaper, int, error) {
+	// Validate query
+	query = strings.TrimSpace(query)
+	if len(query) < 2 {
+		return nil, 0, fmt.Errorf("search query must be at least 2 characters")
+	}
+	if len(query) > 100 {
+		return nil, 0, fmt.Errorf("search query must be at most 100 characters")
+	}
+
+	// Validate pagination
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+	offset := (page - 1) * limit
+
+	return s.repo.Search(ctx, query, limit, offset)
+}
+
+// GetWallpapersByTag retrieves wallpapers filtered by tag slug
+func (s *WallpaperService) GetWallpapersByTag(ctx context.Context, tagSlug string, page, limit int) ([]*wallpaper.Wallpaper, int, error) {
+	// Validate tag slug (alphanumeric + hyphens only)
+	tagSlug = strings.TrimSpace(strings.ToLower(tagSlug))
+	if tagSlug == "" {
+		return nil, 0, fmt.Errorf("tag slug cannot be empty")
+	}
+
+	// Validate pagination
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+	offset := (page - 1) * limit
+
+	return s.repo.ListByTag(ctx, tagSlug, limit, offset)
+}
+
+// GetUserWallpapers retrieves all wallpapers uploaded by a specific user
+func (s *WallpaperService) GetUserWallpapers(ctx context.Context, userIDStr string, page, limit int) ([]*wallpaper.Wallpaper, int, error) {
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, 0, fmt.Errorf("invalid user ID")
+	}
+
+	// Validate pagination
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+	offset := (page - 1) * limit
+
+	return s.repo.ListByUser(ctx, userID, limit, offset)
+}
+
+// GetTrendingWallpapers retrieves trending wallpapers (by like count and recency)
+func (s *WallpaperService) GetTrendingWallpapers(ctx context.Context, page, limit int) ([]*wallpaper.Wallpaper, int, error) {
+	// Validate pagination
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+	offset := (page - 1) * limit
+
+	return s.repo.ListTrending(ctx, limit, offset)
+}

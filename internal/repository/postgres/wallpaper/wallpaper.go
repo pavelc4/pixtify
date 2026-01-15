@@ -353,3 +353,263 @@ func (r *Repository) ListFeatured(ctx context.Context, limit, offset int) ([]*Wa
 
 	return wallpapers, total, nil
 }
+func (r *Repository) Search(ctx context.Context, query string, limit, offset int) ([]*Wallpaper, int, error) {
+	searchPattern := "%" + query + "%"
+
+	// Get total count
+	var total int
+	countQuery := `
+		SELECT COUNT(*) 
+		FROM wallpapers 
+		WHERE deleted_at IS NULL 
+		  AND (title ILIKE $1 OR description ILIKE $1)
+	`
+	err := r.db.QueryRowContext(ctx, countQuery, searchPattern).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Get paginated results
+	query = `
+		SELECT 
+			w.id, w.user_id, w.title, w.thumbnail_url, w.width, w.height,
+			w.view_count, w.like_count, w.created_at,
+			u.username, u.avatar_url
+		FROM wallpapers w
+		INNER JOIN users u ON w.user_id = u.id
+		WHERE w.deleted_at IS NULL
+		  AND (w.title ILIKE $1 OR w.description ILIKE $1)
+		ORDER BY w.created_at DESC
+		LIMIT $2 OFFSET $3
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, searchPattern, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var wallpapers []*Wallpaper
+
+	for rows.Next() {
+		var w Wallpaper
+		var u User
+		var avatarURL sql.NullString
+
+		if err := rows.Scan(
+			&w.ID, &w.UserID, &w.Title, &w.ThumbnailURL, &w.Width, &w.Height,
+			&w.ViewCount, &w.LikeCount, &w.CreatedAt,
+			&u.Username, &avatarURL,
+		); err != nil {
+			return nil, 0, err
+		}
+
+		if avatarURL.Valid {
+			u.AvatarURL = &avatarURL.String
+		}
+		u.ID = w.UserID
+		w.User = &u
+		wallpapers = append(wallpapers, &w)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	return wallpapers, total, nil
+}
+
+// ListByTag retrieves wallpapers filtered by tag slug
+func (r *Repository) ListByTag(ctx context.Context, tagSlug string, limit, offset int) ([]*Wallpaper, int, error) {
+	// Get total count
+	var total int
+	countQuery := `
+		SELECT COUNT(*) 
+		FROM wallpapers w
+		INNER JOIN wallpaper_tags wt ON w.id = wt.wallpaper_id
+		INNER JOIN tags t ON wt.tag_id = t.id
+		WHERE w.deleted_at IS NULL AND t.slug = $1
+	`
+	err := r.db.QueryRowContext(ctx, countQuery, tagSlug).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Get paginated results
+	query := `
+		SELECT 
+			w.id, w.user_id, w.title, w.thumbnail_url, w.width, w.height,
+			w.view_count, w.like_count, w.created_at,
+			u.username, u.avatar_url
+		FROM wallpapers w
+		INNER JOIN users u ON w.user_id = u.id
+		INNER JOIN wallpaper_tags wt ON w.id = wt.wallpaper_id
+		INNER JOIN tags t ON wt.tag_id = t.id
+		WHERE w.deleted_at IS NULL AND t.slug = $1
+		ORDER BY w.created_at DESC
+		LIMIT $2 OFFSET $3
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, tagSlug, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var wallpapers []*Wallpaper
+
+	for rows.Next() {
+		var w Wallpaper
+		var u User
+		var avatarURL sql.NullString
+
+		if err := rows.Scan(
+			&w.ID, &w.UserID, &w.Title, &w.ThumbnailURL, &w.Width, &w.Height,
+			&w.ViewCount, &w.LikeCount, &w.CreatedAt,
+			&u.Username, &avatarURL,
+		); err != nil {
+			return nil, 0, err
+		}
+
+		if avatarURL.Valid {
+			u.AvatarURL = &avatarURL.String
+		}
+		u.ID = w.UserID
+		w.User = &u
+		wallpapers = append(wallpapers, &w)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	return wallpapers, total, nil
+}
+
+// ListByUser retrieves all wallpapers uploaded by a specific user
+func (r *Repository) ListByUser(ctx context.Context, userID uuid.UUID, limit, offset int) ([]*Wallpaper, int, error) {
+	// Get total count
+	var total int
+	countQuery := `
+		SELECT COUNT(*) 
+		FROM wallpapers 
+		WHERE user_id = $1 AND deleted_at IS NULL
+	`
+	err := r.db.QueryRowContext(ctx, countQuery, userID).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Get paginated results
+	query := `
+		SELECT 
+			w.id, w.user_id, w.title, w.thumbnail_url, w.width, w.height,
+			w.view_count, w.like_count, w.created_at,
+			u.username, u.avatar_url
+		FROM wallpapers w
+		INNER JOIN users u ON w.user_id = u.id
+		WHERE w.user_id = $1 AND w.deleted_at IS NULL
+		ORDER BY w.created_at DESC
+		LIMIT $2 OFFSET $3
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, userID, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var wallpapers []*Wallpaper
+
+	for rows.Next() {
+		var w Wallpaper
+		var u User
+		var avatarURL sql.NullString
+
+		if err := rows.Scan(
+			&w.ID, &w.UserID, &w.Title, &w.ThumbnailURL, &w.Width, &w.Height,
+			&w.ViewCount, &w.LikeCount, &w.CreatedAt,
+			&u.Username, &avatarURL,
+		); err != nil {
+			return nil, 0, err
+		}
+
+		if avatarURL.Valid {
+			u.AvatarURL = &avatarURL.String
+		}
+		u.ID = w.UserID
+		w.User = &u
+		wallpapers = append(wallpapers, &w)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	return wallpapers, total, nil
+}
+
+// ListTrending retrieves trending wallpapers (by like count and recency)
+func (r *Repository) ListTrending(ctx context.Context, limit, offset int) ([]*Wallpaper, int, error) {
+	// Get total count (last 30 days)
+	var total int
+	countQuery := `
+		SELECT COUNT(*) 
+		FROM wallpapers 
+		WHERE deleted_at IS NULL
+		  AND created_at >= NOW() - INTERVAL '30 days'
+	`
+	err := r.db.QueryRowContext(ctx, countQuery).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Get paginated results sorted by engagement
+	query := `
+		SELECT 
+			w.id, w.user_id, w.title, w.thumbnail_url, w.width, w.height,
+			w.view_count, w.like_count, w.created_at,
+			u.username, u.avatar_url
+		FROM wallpapers w
+		INNER JOIN users u ON w.user_id = u.id
+		WHERE w.deleted_at IS NULL
+		  AND w.created_at >= NOW() - INTERVAL '30 days'
+		ORDER BY w.like_count DESC, w.created_at DESC
+		LIMIT $1 OFFSET $2
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var wallpapers []*Wallpaper
+
+	for rows.Next() {
+		var w Wallpaper
+		var u User
+		var avatarURL sql.NullString
+
+		if err := rows.Scan(
+			&w.ID, &w.UserID, &w.Title, &w.ThumbnailURL, &w.Width, &w.Height,
+			&w.ViewCount, &w.LikeCount, &w.CreatedAt,
+			&u.Username, &avatarURL,
+		); err != nil {
+			return nil, 0, err
+		}
+
+		if avatarURL.Valid {
+			u.AvatarURL = &avatarURL.String
+		}
+		u.ID = w.UserID
+		w.User = &u
+		wallpapers = append(wallpapers, &w)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	return wallpapers, total, nil
+}

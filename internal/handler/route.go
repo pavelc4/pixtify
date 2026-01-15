@@ -12,6 +12,7 @@ func SetupRoutes(
 	reportHandler *ReportHandler,
 	wallpaperHandler *WallpaperHandler,
 	collectionHandler *CollectionHandler,
+	tagHandler *TagHandler,
 	jwtMiddleware *middleware.JWTMiddleware,
 	rateLimiter *middleware.RateLimiterMiddleware,
 ) {
@@ -40,7 +41,15 @@ func SetupRoutes(
 		// Public Wallpaper Routes
 		public.Get("/wallpapers", wallpaperHandler.ListWallpapers)
 		public.Get("/wallpapers/featured", wallpaperHandler.ListFeaturedWallpapers)
+		public.Get("/wallpapers/search", wallpaperHandler.SearchWallpapers)
+		public.Get("/wallpapers/trending", wallpaperHandler.GetTrendingWallpapers)
 		public.Get("/wallpapers/:id", wallpaperHandler.GetWallpaper)
+
+		// Public Tag Routes
+		public.Get("/tags", tagHandler.ListTags)
+
+		// Public User Routes
+		public.Get("/users/:id/wallpapers", wallpaperHandler.GetUserWallpapers)
 
 		// Public Collection Routes - these are now moved to protected
 	}
@@ -97,6 +106,10 @@ func SetupRoutes(
 			moderator.Get("/reports", reportHandler.ListReports)
 			moderator.Get("/reports/:id", reportHandler.GetReportByID)
 			moderator.Put("/reports/:id", reportHandler.UpdateReportStatus)
+
+			// Tag management
+			moderator.Post("/tags", tagHandler.CreateTag)
+			moderator.Delete("/tags/:id", tagHandler.DeleteTag)
 		}
 	}
 

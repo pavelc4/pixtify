@@ -19,6 +19,7 @@ import (
 	"github.com/pavelc4/pixtify/internal/repository/postgres"
 	"github.com/pavelc4/pixtify/internal/repository/postgres/collection"
 	"github.com/pavelc4/pixtify/internal/repository/postgres/like"
+	"github.com/pavelc4/pixtify/internal/repository/postgres/tag"
 	"github.com/pavelc4/pixtify/internal/repository/postgres/user"
 	"github.com/pavelc4/pixtify/internal/repository/postgres/wallpaper"
 	"github.com/pavelc4/pixtify/internal/service"
@@ -115,6 +116,12 @@ func main() {
 	collectionHandler := handler.NewCollectionHandler(collectionService)
 	log.Println("Wallpaper system initialized")
 
+	// Tag System
+	tagRepo := tag.NewRepository(db)
+	tagService := service.NewTagService(tagRepo)
+	tagHandler := handler.NewTagHandler(tagService)
+	log.Println("Tag system initialized")
+
 	jwtMiddleware := middleware.NewJWTMiddleware(jwtService)
 	rateLimitConfig := config.DefaultRateLimitConfig()
 	rateLimiter := middleware.NewRateLimiterMiddleware(rateLimitConfig)
@@ -138,7 +145,7 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	handler.SetupRoutes(app, userHandler, oauthHandler, reportHandler, wallpaperHandler, collectionHandler, jwtMiddleware, rateLimiter)
+	handler.SetupRoutes(app, userHandler, oauthHandler, reportHandler, wallpaperHandler, collectionHandler, tagHandler, jwtMiddleware, rateLimiter)
 	log.Println("Routes configured")
 
 	port := fmt.Sprintf(":%s", cfg.Port)
