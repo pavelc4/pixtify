@@ -58,7 +58,7 @@ func (s *MinIOStorage) Upload(ctx context.Context, bucket, key string, data io.R
 	}
 
 	if s.cdnURL != "" {
-		return fmt.Sprintf("%s/%s/%s", s.cdnURL, bucket, key), nil
+		return fmt.Sprintf("%s/%s", s.cdnURL, key), nil
 	}
 	return fmt.Sprintf("http://%s/%s/%s", s.client.EndpointURL().Host, bucket, key), nil
 }
