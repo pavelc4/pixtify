@@ -26,6 +26,7 @@ import (
 )
 
 func main() {
+	startTime := time.Now()
 	cfg := config.Load()
 	log.Println("Configuration loaded")
 
@@ -147,7 +148,24 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	handler.SetupRoutes(app, userHandler, oauthHandler, reportHandler, wallpaperHandler, collectionHandler, tagHandler, jwtMiddleware, rateLimiter)
+	healthHandler := &handler.HealthHandler{
+		StartTime: startTime,
+		DB:        db,
+		Storage:   minioStorage,
+	}
+
+	handler.SetupRoutes(
+		app,
+		userHandler,
+		oauthHandler,
+		reportHandler,
+		wallpaperHandler,
+		collectionHandler,
+		tagHandler,
+		healthHandler,
+		jwtMiddleware,
+		rateLimiter,
+	)
 	log.Println("Routes configured")
 
 	port := fmt.Sprintf(":%s", cfg.Port)
@@ -161,12 +179,6 @@ func main() {
 	log.Printf("  - Register: %d req/%s", rateLimitConfig.RegisterMax, rateLimitConfig.RegisterWindow)
 	log.Printf("  - OAuth: %d req/%s", rateLimitConfig.OAuthMax, rateLimitConfig.OAuthWindow)
 	log.Printf("  - API: %d req/%s", rateLimitConfig.APIMax, rateLimitConfig.APIWindow)
-
-	// Custom startup message (Gin-style)
-	log.Printf("\n🚀 Pixtify API v1.0.0")
-	log.Printf("📡 Listening on http://0.0.0.0%s", port)
-	log.Printf("📊 Total endpoints: 89")
-	log.Printf("⚙️  Environment: %s\n", cfg.Env)
 
 	if err := app.Listen(port); err != nil {
 		log.Fatal("Failed to start server:", err)

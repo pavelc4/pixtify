@@ -13,6 +13,7 @@ func SetupRoutes(
 	wallpaperHandler *WallpaperHandler,
 	collectionHandler *CollectionHandler,
 	tagHandler *TagHandler,
+	healthHandler *HealthHandler,
 	jwtMiddleware *middleware.JWTMiddleware,
 	rateLimiter *middleware.RateLimiterMiddleware,
 ) {
@@ -119,12 +120,7 @@ func SetupRoutes(
 	public.Get("/collections/:id/wallpapers", collectionHandler.GetCollectionWallpapers)
 
 	// Health check
-	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"status":  "healthy",
-			"service": "pixtify-api",
-		})
-	})
+	app.Get("/health", healthHandler.Check)
 
 	// 404 handler
 	app.Use(func(c *fiber.Ctx) error {
