@@ -126,15 +126,19 @@ func main() {
 	log.Println("Middleware initialized")
 
 	app := fiber.New(fiber.Config{
-		AppName:      "Pixtify API",
-		ServerHeader: "Pixtify",
-		ErrorHandler: customErrorHandler,
-		BodyLimit:    100 * 1024 * 1024,
+		AppName:               "Pixtify API",
+		ServerHeader:          "Pixtify",
+		ErrorHandler:          customErrorHandler,
+		BodyLimit:             100 * 1024 * 1024,
+		DisableStartupMessage: true, // Disable ASCII banner
 	})
 
 	app.Use(recover.New())
 	app.Use(logger.New(logger.Config{
-		Format: "[${time}] ${status} - ${latency} ${method} ${path}\\n",
+		Format:     "${cyan}[${time}]${reset} ${status} ${yellow}${latency}${reset} ${magenta}${method}${reset} ${path}\n",
+		TimeFormat: "15:04:05",
+		TimeZone:   "Local",
+		Output:     nil, // stdout
 	}))
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "http://localhost:3000,http://localhost:5173",
@@ -157,6 +161,12 @@ func main() {
 	log.Printf("  - Register: %d req/%s", rateLimitConfig.RegisterMax, rateLimitConfig.RegisterWindow)
 	log.Printf("  - OAuth: %d req/%s", rateLimitConfig.OAuthMax, rateLimitConfig.OAuthWindow)
 	log.Printf("  - API: %d req/%s", rateLimitConfig.APIMax, rateLimitConfig.APIWindow)
+
+	// Custom startup message (Gin-style)
+	log.Printf("\n🚀 Pixtify API v1.0.0")
+	log.Printf("📡 Listening on http://0.0.0.0%s", port)
+	log.Printf("📊 Total endpoints: 89")
+	log.Printf("⚙️  Environment: %s\n", cfg.Env)
 
 	if err := app.Listen(port); err != nil {
 		log.Fatal("Failed to start server:", err)
