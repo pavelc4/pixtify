@@ -1,0 +1,11 @@
+.git
+.github
+.idea
+.env
+.env.*
+*.md
+bin/
+coverage.*
+Makefile
+docs/
+*.json
