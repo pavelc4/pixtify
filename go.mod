@@ -12,7 +12,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.98
 	github.com/shirou/gopsutil/v3 v3.24.5
 	golang.org/x/crypto v0.48.0
-	golang.org/x/oauth2 v0.34.0
+	golang.org/x/oauth2 v0.35.0
 )
 
 require (
